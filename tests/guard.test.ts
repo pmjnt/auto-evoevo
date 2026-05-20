@@ -110,6 +110,27 @@ describe("evaluateWalletRequest", () => {
     });
   });
 
+  it("pauses when estimated fee is NaN", () => {
+    expect(
+      evaluateWalletRequest(
+        request({ estimatedFeeNative: Number.NaN }),
+        config,
+      ),
+    ).toEqual({
+      status: "needs_manual_review",
+      reason: "Estimated fee could not be read from wallet popup",
+    });
+  });
+
+  it("pauses when estimated fee is negative", () => {
+    expect(
+      evaluateWalletRequest(request({ estimatedFeeNative: -0.1 }), config),
+    ).toEqual({
+      status: "needs_manual_review",
+      reason: "Estimated fee could not be read from wallet popup",
+    });
+  });
+
   it("pauses on severe warning", () => {
     expect(
       evaluateWalletRequest(request({ hasSevereWarning: true }), config),

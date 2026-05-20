@@ -58,6 +58,16 @@ export function evaluateWalletRequest(
     };
   }
 
+  if (
+    !Number.isFinite(request.estimatedFeeNative) ||
+    request.estimatedFeeNative < 0
+  ) {
+    return {
+      status: "needs_manual_review",
+      reason: "Estimated fee could not be read from wallet popup",
+    };
+  }
+
   if (request.estimatedFeeNative > config.maxFeeNative) {
     return {
       status: "reject",
