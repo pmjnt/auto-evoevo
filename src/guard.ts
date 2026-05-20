@@ -4,10 +4,24 @@ export function evaluateWalletRequest(
   request: WalletRequest,
   config: RunnerConfig,
 ): GuardDecision {
+  if (request.origin === null) {
+    return {
+      status: "needs_manual_review",
+      reason: "Origin could not be read from wallet popup",
+    };
+  }
+
   if (request.origin !== config.allowedOrigin) {
     return {
       status: "reject",
       reason: `Unexpected origin: ${request.origin}`,
+    };
+  }
+
+  if (request.chain === null) {
+    return {
+      status: "needs_manual_review",
+      reason: "Chain could not be read from wallet popup",
     };
   }
 

@@ -51,10 +51,24 @@ describe("evaluateWalletRequest", () => {
     });
   });
 
+  it("pauses when origin is unavailable", () => {
+    expect(evaluateWalletRequest(request({ origin: null }), config)).toEqual({
+      status: "needs_manual_review",
+      reason: "Origin could not be read from wallet popup",
+    });
+  });
+
   it("requires 0G chain", () => {
     expect(evaluateWalletRequest(request({ chain: "Ethereum" }), config)).toEqual({
       status: "reject",
       reason: "Unexpected chain: Ethereum",
+    });
+  });
+
+  it("pauses when chain is unavailable", () => {
+    expect(evaluateWalletRequest(request({ chain: null }), config)).toEqual({
+      status: "needs_manual_review",
+      reason: "Chain could not be read from wallet popup",
     });
   });
 
