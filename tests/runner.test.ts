@@ -99,9 +99,31 @@ const approvedDecision: GuardDecision = {
 
 describe("run", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mocks.launchPersistentContext.mockReset();
+    mocks.EvoEvoController.mockClear();
+    mocks.SessionLogger.mockReset();
+    mocks.signRabbyPopup.mockReset();
+    mocks.context.pages.mockReset();
+    mocks.context.newPage.mockReset();
+    mocks.context.close.mockReset();
+    mocks.page.url.mockReset();
+    mocks.controller.openFeed.mockReset();
+    mocks.controller.nextMemoryButton.mockReset();
+    mocks.controller.clickShowMore.mockReset();
+    mocks.controller.clickMemoryButton.mockReset();
+    mocks.logger.record.mockReset();
+    mocks.logger.summary.mockReset();
+    mocks.consoleLog.mockClear();
+    mocks.consoleError.mockClear();
+    mocks.launchPersistentContext.mockResolvedValue(mocks.context);
+    mocks.EvoEvoController.mockImplementation(() => mocks.controller);
+    mocks.SessionLogger.mockImplementation(() => mocks.logger);
     mocks.page.url.mockReturnValue("https://evoevo.ai/feed");
     mocks.context.pages.mockReturnValue([mocks.page]);
+    mocks.context.newPage.mockResolvedValue(mocks.page);
+    mocks.context.close.mockResolvedValue(undefined);
+    mocks.controller.openFeed.mockResolvedValue(undefined);
+    mocks.controller.clickMemoryButton.mockResolvedValue(undefined);
     mocks.logger.summary.mockReturnValue({
       signed: 0,
       skipped: 0,
@@ -151,10 +173,103 @@ describe("run", () => {
         walletRequest: request,
         decision: approvedDecision,
         status: "dry_run",
-        reason: "Dry run",
+        reason: `Dry run: ${approvedDecision.reason}`,
       }),
     );
     expect(mocks.controller.clickShowMore).toHaveBeenCalledTimes(2);
+    expect(mocks.context.close).toHaveBeenCalled();
+  });
+
+  it("creates the session logger before launching Chrome", async () => {
+    const { run } = await import("../src/runner.js");
+
+    mocks.SessionLogger.mockImplementationOnce(() => {
+      throw new Error("Cannot create log directory");
+    });
+
+    await expect(run(config)).rejects.toThrow("Cannot create log directory");
+
+    expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+    expect(mocks.context.close).not.toHaveBeenCalled();
+  });
+
+  it("includes the guard decision reason in dry-run attempt logs", async () => {
+    const { run } = await import("../src/runner.js");
+    const button = {
+      locator: {},
+      index: 1,
+      label: "Will memory mint safely?",
+    };
+
+    mocks.controller.nextMemoryButton
+      .mockResolvedValueOnce(button)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mocks.controller.clickShowMore.mockResolvedValue(false);
+    mocks.signRabbyPopup.mockResolvedValue({
+      request,
+      decision: approvedDecision,
+      signed: false,
+    });
+
+    await run(config);
+
+    expect(mocks.logger.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "dry_run",
+        reason: `Dry run: ${approvedDecision.reason}`,
+      }),
+    );
+  });
+
+  it("pauses on non-approve decisions during dry-run because the popup may require manual handling", async () => {
+    const { run } = await import("../src/runner.js");
+    const button = {
+      locator: {},
+      index: 2,
+      label: "Risky memory",
+    };
+    const rejectedDecision: GuardDecision = {
+      status: "reject",
+      reason: "Origin did not match allowlist",
+    };
+
+    mocks.controller.nextMemoryButton.mockResolvedValue(button);
+    mocks.signRabbyPopup.mockResolvedValue({
+      request,
+      decision: rejectedDecision,
+      signed: false,
+    });
+
+    await run(config);
+
+    expect(mocks.logger.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "dry_run",
+        reason: `Dry run: ${rejectedDecision.reason}`,
+      }),
+    );
+    expect(mocks.controller.clickMemoryButton).toHaveBeenCalledTimes(1);
+    expect(mocks.signRabbyPopup).toHaveBeenCalledTimes(1);
+    expect(mocks.consoleError).toHaveBeenCalledWith(
+      `Paused: ${rejectedDecision.reason}`,
+    );
+  });
+
+  it("stops after repeated feed expansions without finding an actionable memory button", async () => {
+    const { run } = await import("../src/runner.js");
+
+    mocks.controller.nextMemoryButton
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("Loop did not stop"));
+    mocks.controller.clickShowMore.mockResolvedValue(true);
+
+    await run(config);
+
+    expect(mocks.controller.clickShowMore).toHaveBeenCalledTimes(2);
+    expect(mocks.logger.record).not.toHaveBeenCalled();
     expect(mocks.context.close).toHaveBeenCalled();
   });
 

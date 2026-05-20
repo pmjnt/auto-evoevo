@@ -20,7 +20,12 @@ function attemptStatus(
   return signed ? "signed" : "manual_review";
 }
 
+function attemptReason(config: RunnerConfig, decisionReason: string): string {
+  return config.dryRun ? `Dry run: ${decisionReason}` : decisionReason;
+}
+
 export async function run(config: RunnerConfig): Promise<void> {
+  const logger = new SessionLogger(config.logDir);
   const context = await chromium.launchPersistentContext(
     config.chromeProfilePath,
     {
@@ -28,12 +33,12 @@ export async function run(config: RunnerConfig): Promise<void> {
       channel: "chrome",
     },
   );
-  const logger = new SessionLogger(config.logDir);
 
   try {
     const page = context.pages()[0] ?? (await context.newPage());
     const controller = new EvoEvoController(page, config);
     let idleExpansions = 0;
+    let emptyExpansionStreak = 0;
 
     await controller.openFeed();
 
@@ -45,12 +50,19 @@ export async function run(config: RunnerConfig): Promise<void> {
 
         if (expanded) {
           idleExpansions = 0;
+          emptyExpansionStreak += 1;
+
+          if (emptyExpansionStreak >= 2) {
+            break;
+          }
         } else {
           idleExpansions += 1;
         }
 
         continue;
       }
+
+      emptyExpansionStreak = 0;
 
       try {
         await controller.clickMemoryButton(button);
@@ -65,11 +77,13 @@ export async function run(config: RunnerConfig): Promise<void> {
           walletRequest: signResult.request,
           decision: signResult.decision,
           status,
-          reason: config.dryRun ? "Dry run" : signResult.decision.reason,
+          reason: attemptReason(config, signResult.decision.reason),
         };
 
         logger.record(entry);
 
+        // A non-approve dry-run still leaves the Rabby popup in a state that
+        // may need manual handling, so pause instead of advancing automation.
         if (signResult.decision.status !== "approve") {
           console.error(`Paused: ${signResult.decision.reason}`);
           break;

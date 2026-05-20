@@ -43,9 +43,9 @@ function parseArgs(args: string[]): CliArgs {
 
 const args = parseArgs(process.argv.slice(2));
 const config = loadConfig(args.configPath);
+const effectiveConfig = {
+  ...config,
+  dryRun: args.forceDryRun || config.dryRun,
+};
 
-if (args.forceDryRun) {
-  config.dryRun = true;
-}
-
-await run(config);
+await run(effectiveConfig);
