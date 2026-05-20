@@ -18,6 +18,7 @@ export type GuardDecision = {
 export type RunnerConfig = {
   evoevoUrl: string;
   chromeProfilePath: string;
+  rabbyExtensionId: string;
   allowedOrigin: string;
   allowedChain: string;
   allowedContracts: string[];

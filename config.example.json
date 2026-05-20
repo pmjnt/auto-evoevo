@@ -1,6 +1,7 @@
 {
   "evoevoUrl": "https://evoevo.ai/feed",
   "chromeProfilePath": "C:/Users/pMjn/AppData/Local/Google/Chrome/User Data/Default",
+  "rabbyExtensionId": "acmacodkjbdgmoleebolmdjonilkdbch",
   "allowedOrigin": "https://evoevo.ai",
   "allowedChain": "0G",
   "allowedContracts": ["0x61bb710000000000000000000000000000e937f9"],

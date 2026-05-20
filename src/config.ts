@@ -5,10 +5,12 @@ import { z } from "zod";
 import type { RunnerConfig } from "./types.js";
 
 const ethereumAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
+const chromeExtensionIdSchema = z.string().regex(/^[a-p]{32}$/);
 
 const runnerConfigSchema = z.object({
   evoevoUrl: z.string().url(),
   chromeProfilePath: z.string().min(1),
+  rabbyExtensionId: chromeExtensionIdSchema,
   allowedOrigin: z.string().url(),
   allowedChain: z.string().min(1),
   allowedContracts: z.array(ethereumAddressSchema).min(1),

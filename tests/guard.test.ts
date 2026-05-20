@@ -6,6 +6,7 @@ import type { RunnerConfig, WalletRequest } from "../src/types.js";
 const config: RunnerConfig = {
   evoevoUrl: "https://evoevo.ai",
   chromeProfilePath: "chrome-profile",
+  rabbyExtensionId: "acmacodkjbdgmoleebolmdjonilkdbch",
   allowedOrigin: "https://evoevo.ai",
   allowedChain: "0G",
   allowedContracts: ["0x61bb710000000000000000000000000000e937f9"],

@@ -10,31 +10,44 @@ export type SignResult = {
   signed: boolean;
 };
 
-function isRabbyPopup(page: Page): boolean {
-  return page.url().startsWith("chrome-extension://");
+const RABBY_CONTENT_PATTERN =
+  /(Simulation Results|Unknown Signature Type|Interact contract)/i;
+
+function rabbyPopupUrlPrefix(config: RunnerConfig): string {
+  return `chrome-extension://${config.rabbyExtensionId}/`;
+}
+
+function isRabbyPopup(page: Page, config: RunnerConfig): boolean {
+  return page.url().startsWith(rabbyPopupUrlPrefix(config));
 }
 
 export async function waitForRabbyPopup(
   context: BrowserContext,
-  timeoutMs: number,
+  config: RunnerConfig,
 ): Promise<Page> {
-  const existingPopup = context.pages().find(isRabbyPopup);
+  try {
+    return await context.waitForEvent("page", {
+      predicate: (page) => isRabbyPopup(page, config),
+      timeout: config.timeoutsMs.popup,
+    });
+  } catch (error) {
+    const existingPopup = context
+      .pages()
+      .find((page) => isRabbyPopup(page, config));
 
-  if (existingPopup !== undefined) {
-    return existingPopup;
+    if (existingPopup !== undefined) {
+      return existingPopup;
+    }
+
+    throw error;
   }
-
-  return context.waitForEvent("page", {
-    predicate: isRabbyPopup,
-    timeout: timeoutMs,
-  });
 }
 
 export async function signRabbyPopup(
   context: BrowserContext,
   config: RunnerConfig,
 ): Promise<SignResult> {
-  const popup = await waitForRabbyPopup(context, config.timeoutsMs.popup);
+  const popup = await waitForRabbyPopup(context, config);
 
   await popup.waitForLoadState("domcontentloaded", {
     timeout: config.timeoutsMs.signing,
@@ -46,15 +59,38 @@ export async function signRabbyPopup(
   const request = parseRabbyText(rawText);
   const decision = evaluateWalletRequest(request, config);
 
-  if (decision.status !== "approve" || config.dryRun) {
+  if (
+    decision.status !== "approve" ||
+    config.dryRun ||
+    !RABBY_CONTENT_PATTERN.test(rawText)
+  ) {
     return {
       request,
-      decision,
+      decision: RABBY_CONTENT_PATTERN.test(rawText)
+        ? decision
+        : {
+            status: "needs_manual_review",
+            reason: "Rabby popup content could not be verified",
+          },
       signed: false,
     };
   }
 
-  await popup.getByRole("button", { name: /^Sign$/i }).click({
+  const signButtons = popup.getByRole("button", { name: /^Sign$/i });
+  const visibleSignButtonCount = await signButtons.count();
+
+  if (visibleSignButtonCount !== 1) {
+    return {
+      request,
+      decision: {
+        status: "needs_manual_review",
+        reason: "Rabby Sign button was not uniquely available",
+      },
+      signed: false,
+    };
+  }
+
+  await signButtons.first().click({
     timeout: config.timeoutsMs.signing,
   });
 

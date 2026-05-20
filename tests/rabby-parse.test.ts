@@ -51,4 +51,70 @@ describe("parseRabbyText", () => {
 
     expect(parseRabbyText(text).hasSevereWarning).toBe(true);
   });
+
+  test("only parses a unique contract from Interact contract context", () => {
+    const text = [
+      "https://evoevo.ai",
+      "Allowed address",
+      "0x61bb710000000000000000000000000000e937f9",
+      "Interact contract",
+      "0x0000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000002",
+      "0.000416 OG",
+    ].join("\n");
+
+    expect(parseRabbyText(text).contract).toBeNull();
+  });
+
+  test("does not trust multiple origins", () => {
+    const text = [
+      "https://evoevo.ai",
+      "https://example.com",
+      "Unknown Signature Type",
+      "Interact contract",
+      "0x61bb710000000000000000000000000000e937f9",
+      "0.000416 OG",
+    ].join("\n");
+
+    expect(parseRabbyText(text)).toMatchObject({
+      origin: null,
+      actionFingerprint: null,
+    });
+  });
+
+  test("prefers labeled fee amounts over earlier unlabeled amounts", () => {
+    const text = [
+      "https://evoevo.ai",
+      "Interact contract",
+      "0x61bb710000000000000000000000000000e937f9",
+      "0.0001 OG",
+      "Network fee 0.01 OG",
+    ].join("\n");
+
+    expect(parseRabbyText(text).estimatedFeeNative).toBe(0.01);
+  });
+
+  test("does not parse ambiguous unlabeled OG amounts", () => {
+    const text = [
+      "https://evoevo.ai",
+      "Interact contract",
+      "0x61bb710000000000000000000000000000e937f9",
+      "0.0001 OG",
+      "0.01 OG",
+    ].join("\n");
+
+    expect(parseRabbyText(text).estimatedFeeNative).toBeNull();
+  });
+
+  test("flags expanded severe warning vocabulary", () => {
+    for (const warning of [
+      "suspicious",
+      "unsafe",
+      "security alert",
+      "blacklisted",
+      "not verified",
+    ]) {
+      expect(parseRabbyText(warning).hasSevereWarning).toBe(true);
+    }
+  });
 });
