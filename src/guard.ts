@@ -40,7 +40,7 @@ export function evaluateWalletRequest(
   if (request.estimatedFeeNative === null) {
     return {
       status: "needs_manual_review",
-      reason: "Estimated fee is unavailable",
+      reason: "Estimated fee could not be read from wallet popup",
     };
   }
 

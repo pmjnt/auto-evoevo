@@ -87,6 +87,15 @@ describe("evaluateWalletRequest", () => {
     });
   });
 
+  it("pauses when estimated fee is unavailable", () => {
+    expect(
+      evaluateWalletRequest(request({ estimatedFeeNative: null }), config),
+    ).toEqual({
+      status: "needs_manual_review",
+      reason: "Estimated fee could not be read from wallet popup",
+    });
+  });
+
   it("pauses on severe warning", () => {
     expect(
       evaluateWalletRequest(request({ hasSevereWarning: true }), config),
