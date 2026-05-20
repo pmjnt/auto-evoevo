@@ -149,4 +149,16 @@ describe("evaluateWalletRequest", () => {
       reason: "Action fingerprint is unavailable",
     });
   });
+
+  it("pauses when action fingerprint is unavailable even if learned patterns are allowed", () => {
+    expect(
+      evaluateWalletRequest(request({ actionFingerprint: null }), {
+        ...config,
+        allowLearnedActionPattern: true,
+      }),
+    ).toEqual({
+      status: "needs_manual_review",
+      reason: "Action fingerprint is unavailable",
+    });
+  });
 });

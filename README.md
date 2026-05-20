@@ -6,7 +6,7 @@ Local Playwright/CDP automation for EvoEvo `ADD TO MEMORY` actions with guarded 
 
 1. Run `npm install`.
 2. Copy `config.example.json` to `config.local.json`.
-3. Set `chromeProfilePath` to a Chrome profile logged into EvoEvo and Rabby.
+3. Set `chromeProfilePath` to a dedicated Chrome automation profile, not your live `Default` profile. Prepare or copy a profile that is logged into EvoEvo and Rabby, such as `C:/Users/pMjn/AppData/Local/Google/Chrome/User Data/Auto EvoEvo`.
 4. Set `rabbyExtensionId` to the installed Rabby Chrome extension ID. `config.example.json` defaults to Rabby's Chrome extension ID.
 5. Replace `allowedContracts` with the full EvoEvo contract address from a manually verified transaction.
 6. Keep `dryRun` set to `true` for the first run.
@@ -26,6 +26,7 @@ Logs are written as JSONL files in `logs/`.
 ## Guarded Signing
 
 Set `dryRun` to `false` only after dry-run logs show the expected origin, chain, contract, action fingerprint, and fee.
+`allowLearnedActionPattern` is kept for config compatibility, but unavailable action fingerprints still pause for manual review.
 
 ```powershell
 npm start -- --config config.local.json

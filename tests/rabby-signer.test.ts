@@ -142,6 +142,22 @@ describe("waitForRabbyPopup", () => {
       ),
     ).resolves.toBe(newPage);
   });
+
+  test("ignores a stale existing Rabby popup when no new popup appears", async () => {
+    const existingPage = fakePage({
+      url: `chrome-extension://${RABBY_EXTENSION_ID}/existing.html`,
+    });
+
+    await expect(
+      waitForRabbyPopup(
+        fakeContext({
+          pages: [existingPage],
+          eventError: new Error("timeout"),
+        }),
+        config(),
+      ),
+    ).rejects.toThrow("timeout");
+  });
 });
 
 describe("signRabbyPopup", () => {
@@ -160,7 +176,7 @@ describe("signRabbyPopup", () => {
 
     await expect(
       signRabbyPopup(
-        fakeContext({ pages: [page], eventError: new Error("timeout") }),
+        fakeContext({ eventPage: page }),
         config({ dryRun: false }),
       ),
     ).resolves.toMatchObject({
@@ -177,7 +193,7 @@ describe("signRabbyPopup", () => {
 
     await expect(
       signRabbyPopup(
-        fakeContext({ pages: [page], eventError: new Error("timeout") }),
+        fakeContext({ eventPage: page }),
         config({ dryRun: true }),
       ),
     ).resolves.toMatchObject({ signed: false });
@@ -189,7 +205,7 @@ describe("signRabbyPopup", () => {
 
     await expect(
       signRabbyPopup(
-        fakeContext({ pages: [page], eventError: new Error("timeout") }),
+        fakeContext({ eventPage: page }),
         config({ dryRun: false }),
       ),
     ).resolves.toMatchObject({
@@ -207,7 +223,7 @@ describe("signRabbyPopup", () => {
 
     await expect(
       signRabbyPopup(
-        fakeContext({ pages: [page], eventError: new Error("timeout") }),
+        fakeContext({ eventPage: page }),
         config({ dryRun: false }),
       ),
     ).resolves.toMatchObject({
@@ -225,7 +241,7 @@ describe("signRabbyPopup", () => {
 
     await expect(
       signRabbyPopup(
-        fakeContext({ pages: [page], eventError: new Error("timeout") }),
+        fakeContext({ eventPage: page }),
         config({ dryRun: false }),
       ),
     ).resolves.toMatchObject({ signed: true });

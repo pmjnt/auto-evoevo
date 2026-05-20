@@ -256,19 +256,26 @@ describe("run", () => {
     );
   });
 
-  it("stops after repeated feed expansions without finding an actionable memory button", async () => {
+  it("continues through successful feed expansions until the feed is idle twice", async () => {
     const { run } = await import("../src/runner.js");
 
     mocks.controller.nextMemoryButton
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
       .mockRejectedValueOnce(new Error("Loop did not stop"));
-    mocks.controller.clickShowMore.mockResolvedValue(true);
+    mocks.controller.clickShowMore
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
 
     await run(config);
 
-    expect(mocks.controller.clickShowMore).toHaveBeenCalledTimes(2);
+    expect(mocks.controller.clickShowMore).toHaveBeenCalledTimes(5);
     expect(mocks.logger.record).not.toHaveBeenCalled();
     expect(mocks.context.close).toHaveBeenCalled();
   });

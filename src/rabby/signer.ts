@@ -25,22 +25,10 @@ export async function waitForRabbyPopup(
   context: BrowserContext,
   config: RunnerConfig,
 ): Promise<Page> {
-  try {
-    return await context.waitForEvent("page", {
-      predicate: (page) => isRabbyPopup(page, config),
-      timeout: config.timeoutsMs.popup,
-    });
-  } catch (error) {
-    const existingPopup = context
-      .pages()
-      .find((page) => isRabbyPopup(page, config));
-
-    if (existingPopup !== undefined) {
-      return existingPopup;
-    }
-
-    throw error;
-  }
+  return await context.waitForEvent("page", {
+    predicate: (page) => isRabbyPopup(page, config),
+    timeout: config.timeoutsMs.popup,
+  });
 }
 
 export async function signRabbyPopup(

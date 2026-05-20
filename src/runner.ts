@@ -38,7 +38,6 @@ export async function run(config: RunnerConfig): Promise<void> {
     const page = context.pages()[0] ?? (await context.newPage());
     const controller = new EvoEvoController(page, config);
     let idleExpansions = 0;
-    let emptyExpansionStreak = 0;
 
     await controller.openFeed();
 
@@ -50,19 +49,12 @@ export async function run(config: RunnerConfig): Promise<void> {
 
         if (expanded) {
           idleExpansions = 0;
-          emptyExpansionStreak += 1;
-
-          if (emptyExpansionStreak >= 2) {
-            break;
-          }
         } else {
           idleExpansions += 1;
         }
 
         continue;
       }
-
-      emptyExpansionStreak = 0;
 
       try {
         await controller.clickMemoryButton(button);

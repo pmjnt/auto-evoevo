@@ -82,10 +82,7 @@ export function evaluateWalletRequest(
     };
   }
 
-  if (
-    request.actionFingerprint === null &&
-    !config.allowLearnedActionPattern
-  ) {
+  if (request.actionFingerprint === null) {
     return {
       status: "needs_manual_review",
       reason: "Action fingerprint is unavailable",
