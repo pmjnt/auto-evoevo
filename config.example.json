@@ -1,0 +1,17 @@
+{
+  "evoevoUrl": "https://evoevo.ai/feed",
+  "chromeProfilePath": "C:/Users/pMjn/AppData/Local/Google/Chrome/User Data/Default",
+  "allowedOrigin": "https://evoevo.ai",
+  "allowedChain": "0G",
+  "allowedContracts": ["0x61bb710000000000000000000000000000e937f9"],
+  "maxFeeNative": 0.001,
+  "allowLearnedActionPattern": false,
+  "dryRun": true,
+  "timeoutsMs": {
+    "pageLoad": 30000,
+    "popup": 20000,
+    "signing": 30000,
+    "feedExpansion": 15000
+  },
+  "logDir": "logs"
+}

@@ -1,0 +1,22 @@
+{
+  "name": "auto-evoevo-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts",
+    "dry-run": "tsx src/index.ts --dry-run"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "tsx": "^4.15.7",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
