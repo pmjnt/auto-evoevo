@@ -94,6 +94,18 @@ describe("parseRabbyText", () => {
     expect(parseRabbyText(text).estimatedFeeNative).toBe(0.01);
   });
 
+  test("does not parse ambiguous labeled fee amounts", () => {
+    const text = [
+      "https://evoevo.ai",
+      "Interact contract",
+      "0x61bb710000000000000000000000000000e937f9",
+      "Gas 0.0001 OG",
+      "Network fee 0.01 OG",
+    ].join("\n");
+
+    expect(parseRabbyText(text).estimatedFeeNative).toBeNull();
+  });
+
   test("does not parse ambiguous unlabeled OG amounts", () => {
     const text = [
       "https://evoevo.ai",

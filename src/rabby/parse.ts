@@ -77,7 +77,7 @@ function parseEstimatedFeeNative(rawText: string): number | null {
     .flatMap((line) => parseOgAmounts(line));
 
   if (labeledFeeAmounts.length > 0) {
-    return Math.max(...labeledFeeAmounts);
+    return labeledFeeAmounts.length === 1 ? labeledFeeAmounts[0] : null;
   }
 
   const unlabeledAmounts = parseOgAmounts(rawText);
