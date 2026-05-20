@@ -2,6 +2,10 @@ import type { Locator, Page } from "playwright";
 
 import type { RunnerConfig } from "../types.js";
 
+const ATTEMPTED_ID_ATTRIBUTE = "data-auto-evoevo-attempted-id";
+const CONTROL_LINE_PATTERN =
+  /^(add to memory|show more|expand|crypto|resolve|yes\/no|yes|no)$/i;
+
 export type MemoryButton = {
   locator: Locator;
   index: number;
@@ -9,6 +13,8 @@ export type MemoryButton = {
 };
 
 export class EvoEvoController {
+  private nextAttemptId = 1;
+
   constructor(
     private readonly page: Page,
     private readonly config: RunnerConfig,
@@ -34,11 +40,29 @@ export class EvoEvoController {
     for (let index = 0; index < count; index += 1) {
       const locator = buttons.nth(index);
 
+      if ((await locator.getAttribute(ATTEMPTED_ID_ATTRIBUTE)) !== null) {
+        continue;
+      }
+
       if ((await locator.isVisible()) && (await locator.isEnabled())) {
+        const label = await this.cardLabelFor(locator);
+        const attemptedId = String(this.nextAttemptId);
+
+        this.nextAttemptId += 1;
+
+        await locator.evaluate(
+          (button, marker) => {
+            button.setAttribute("data-auto-evoevo-attempted-id", marker);
+          },
+          attemptedId,
+        );
+
         return {
-          locator,
+          locator: this.page.locator(
+            `[${ATTEMPTED_ID_ATTRIBUTE}="${attemptedId}"]`,
+          ),
           index,
-          label: await this.cardLabelFor(locator),
+          label,
         };
       }
     }
@@ -106,20 +130,48 @@ export class EvoEvoController {
   }
 
   private async cardLabelFor(button: Locator): Promise<string | null> {
-    const card = button.locator(
-      "xpath=ancestor::*[self::article or self::div][1]",
-    );
-    const text = await card.innerText({ timeout: 1000 }).catch(() => null);
+    const article = button.locator("xpath=ancestor::article[1]");
 
-    if (text === null) {
-      return null;
+    if ((await article.count().catch(() => 0)) > 0) {
+      const articleLabel = this.firstUsefulLine(
+        await article.innerText({ timeout: 1000 }).catch(() => null),
+      );
+
+      if (articleLabel !== null) {
+        return articleLabel;
+      }
     }
 
+    for (let ancestorLevel = 2; ancestorLevel <= 6; ancestorLevel += 1) {
+      const card = button.locator(`xpath=ancestor::div[${ancestorLevel}]`);
+
+      if ((await card.count().catch(() => 0)) === 0) {
+        continue;
+      }
+
+      const cardLabel = this.firstUsefulLine(
+        await card.innerText({ timeout: 1000 }).catch(() => null),
+      );
+
+      if (cardLabel !== null) {
+        return cardLabel;
+      }
+    }
+
+    const nearestDiv = button.locator("xpath=ancestor::div[1]");
+
+    return this.firstUsefulLine(
+      await nearestDiv.innerText({ timeout: 1000 }).catch(() => null),
+    );
+  }
+
+  private firstUsefulLine(text: string | null): string | null {
     return (
       text
-        .split(/\r?\n/)
+        ?.split(/\r?\n/)
         .map((line) => line.trim())
-        .find((line) => line.length > 0) ?? null
+        .find((line) => line.length > 0 && !CONTROL_LINE_PATTERN.test(line)) ??
+      null
     );
   }
 }
