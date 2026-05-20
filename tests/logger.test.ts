@@ -43,4 +43,31 @@ describe("SessionLogger", () => {
       '"status":"dry_run"',
     );
   });
+
+  it("does not count attempts that fail to persist", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "auto-evoevo-logger-"));
+    const logger = new SessionLogger(tempDir);
+    const entry: AttemptLog = {
+      timestamp: "2026-05-21T00:00:00.000Z",
+      evoevoUrl: "https://evoevo.ai/feed",
+      cardLabel: "Will Bitcoin reach 87000?",
+      buttonIndex: 0,
+      walletRequest: null,
+      decision: null,
+      status: "dry_run",
+      reason: "Dry run",
+    };
+
+    rmSync(tempDir, { recursive: true, force: true });
+    tempDir = null;
+
+    expect(() => logger.record(entry)).toThrow();
+    expect(logger.summary()).toEqual({
+      signed: 0,
+      skipped: 0,
+      failed: 0,
+      manual_review: 0,
+      dry_run: 0,
+    });
+  });
 });

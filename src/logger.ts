@@ -23,8 +23,8 @@ export class SessionLogger {
   }
 
   record(entry: AttemptLog): void {
-    this.counts[entry.status] += 1;
     appendFileSync(this.filePath, `${JSON.stringify(entry)}\n`, "utf8");
+    this.counts[entry.status] += 1;
   }
 
   summary(): Summary {
