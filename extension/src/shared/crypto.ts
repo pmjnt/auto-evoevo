@@ -13,11 +13,12 @@ function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
-function fromBase64(value: string): Uint8Array {
-  return new Uint8Array(Buffer.from(value, "base64"));
+function fromBase64(value: string): Uint8Array<ArrayBuffer> {
+  const buf = Buffer.from(value, "base64");
+  return new Uint8Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
