@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Auto EvoEvo</title>
+  <style>
+    body { width: 340px; font-family: system-ui, sans-serif; margin: 0; padding: 14px; background: #0f1115; color: #e6e9ef; }
+    h1 { font-size: 14px; margin: 0 0 12px; }
+    label { display: block; font-size: 12px; color: #8a93a6; margin-bottom: 4px; }
+    input, button { font: inherit; }
+    .input { width: 100%; padding: 8px 10px; background: #0e1219; border: 1px solid #2a3142; color: #e6e9ef; border-radius: 6px; }
+    .btn { padding: 8px 12px; border-radius: 6px; background: #7aa2f7; color: #0b0e14; font-weight: 600; border: none; cursor: pointer; }
+    .btn.ghost { background: transparent; color: #e6e9ef; border: 1px solid #2a3142; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 13px; }
+    .kv .k { color: #8a93a6; }
+    section { display: none; }
+    section.active { display: block; }
+  </style>
+</head>
+<body>
+  <h1>Auto EvoEvo</h1>
+  <section id="locked" class="active">
+    <label for="password">Master password</label>
+    <input id="password" class="input" type="password" autocomplete="current-password" />
+    <div class="row">
+      <span></span>
+      <button id="unlock" class="btn">Unlock</button>
+    </div>
+    <div id="unlock-error" style="color: #f7768e; font-size: 12px; margin-top: 8px;"></div>
+  </section>
+
+  <section id="unlocked">
+    <div class="kv">
+      <div class="k">Address</div><div id="address"></div>
+      <div class="k">Signed</div><div id="signed">0</div>
+      <div class="k">Dry-run</div><div id="dry">0</div>
+      <div class="k">Manual</div><div id="manual">0</div>
+      <div class="k">Rejected</div><div id="rejected">0</div>
+    </div>
+    <div class="row">
+      <button id="lock" class="btn ghost">Lock</button>
+      <button id="pause" class="btn">Pause</button>
+    </div>
+  </section>
+  <script src="popup.js"></script>
+</body>
+</html>
