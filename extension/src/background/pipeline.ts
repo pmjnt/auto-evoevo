@@ -43,6 +43,15 @@ export type PipelineResult =
 
 const FALLBACK_GAS_LIMIT = 200_000n;
 
+async function withInflight<T>(key: string, body: () => Promise<T>): Promise<T> {
+  await chrome.storage.session.set({ inflight: { key, ts: Date.now() } });
+  try {
+    return await body();
+  } finally {
+    await chrome.storage.session.remove("inflight");
+  }
+}
+
 export async function runPipeline(input: PipelineInput): Promise<PipelineResult> {
   if (input.method !== "eth_sendTransaction") {
     return { ok: false, errorCode: 4200, reason: `Unsupported method: ${input.method}` };
@@ -112,10 +121,10 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
     chainId: input.config.chainId,
   });
 
+  const inflightKey = `${nonce}-${actionFingerprint ?? "nofp"}`;
   try {
-    const { txHash } = await input.rpc.sendRawTransactionWithNonceRetry(
-      signed,
-      input.wallet.address,
+    const { txHash } = await withInflight(inflightKey, () =>
+      input.rpc.sendRawTransactionWithNonceRetry(signed, input.wallet.address as string),
     );
     await input.log.append(
       makeLog({ status: "signed", reason: decision.reason, walletRequest, decision, txHash }),

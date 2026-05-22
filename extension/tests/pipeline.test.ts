@@ -140,3 +140,25 @@ describe("pipeline.runPipeline", () => {
     expect(logged[0]!.status).toBe("manual_review");
   });
 });
+
+describe("pipeline inflight reconciliation", () => {
+  beforeEach(() => {
+    installFakeChromeApi();
+  });
+
+  it("records (nonce, dataHash) before broadcasting and clears on success", async () => {
+    const { deps, broadcasted, logged } = makeDeps();
+    await runPipeline({
+      method: "eth_sendTransaction",
+      params: [{ to: "0x61bb710000000000000000000000000000e937f9", data: "0xd0e30db0", value: "0x0" }],
+      senderOrigin: "https://evoevo.ai",
+      config,
+      ...deps,
+    } as any);
+
+    const stored = await chrome.storage.session.get("inflight");
+    expect((stored as Record<string, unknown>)["inflight"]).toBeUndefined();
+    expect(broadcasted).toHaveLength(1);
+    expect(logged[0]!.status).toBe("signed");
+  });
+});
