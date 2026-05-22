@@ -1,0 +1,50 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { installFakeChromeApi } from "./fixtures/chrome-api.js";
+import { encryptVault } from "../src/shared/crypto.js";
+import { setVault, setConfig } from "../src/background/storage.js";
+import { handleMessage } from "../src/background/index.js";
+
+const TEST_KEY = "0x" + "11".repeat(32);
+
+describe("background router", () => {
+  beforeEach(async () => {
+    installFakeChromeApi();
+    await setVault(await encryptVault(TEST_KEY, "pw-123"));
+    await setConfig({
+      allowedOrigin: "https://evoevo.ai",
+      allowedChain: "0G",
+      chainId: 16661,
+      rpcUrl: "https://rpc.example",
+      allowedContracts: ["0x" + "ab".repeat(20)],
+      allowedFunctionSelectors: ["0xd0e30db0"],
+      maxFeeNative: 0.001,
+      dryRun: true,
+      idleLockMinutes: 30,
+    });
+    // Reset module-level wallet state
+    await handleMessage({ type: "lock" }, {} as chrome.runtime.MessageSender);
+  });
+
+  it("routes unlock and returns address", async () => {
+    const response = await handleMessage({ type: "unlock", password: "pw-123" }, {
+      tab: { url: "https://evoevo.ai/feed" },
+    } as chrome.runtime.MessageSender);
+    expect(response).toMatchObject({ ok: true });
+    expect((response as any).address).toMatch(/^0x[a-fA-F0-9]{40}$/);
+  });
+
+  it("routes get-status with counts", async () => {
+    const response = await handleMessage({ type: "get-status" }, {} as chrome.runtime.MessageSender);
+    expect(response).toMatchObject({ ok: true, locked: true });
+    expect((response as any).counts).toBeDefined();
+  });
+
+  it("rejects unsupported write method", async () => {
+    const response = await handleMessage(
+      { type: "rpc-request", id: "1", method: "personal_sign", params: ["0xdata", "0xaddr"] },
+      { tab: { url: "https://evoevo.ai/feed" } } as chrome.runtime.MessageSender,
+    );
+    expect(response).toMatchObject({ ok: false });
+    expect((response as any).error.code).toBe(4200);
+  });
+});
