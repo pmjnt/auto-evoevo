@@ -10,12 +10,20 @@ export type Vault = {
 };
 
 function toBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function fromBase64(value: string): Uint8Array<ArrayBuffer> {
-  const buf = Buffer.from(value, "base64");
-  return new Uint8Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  const binary = atob(value);
+  const len = binary.length;
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) out[i] = binary.charCodeAt(i);
+  return out as Uint8Array<ArrayBuffer>;
 }
 
 async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
