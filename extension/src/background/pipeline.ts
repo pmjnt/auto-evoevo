@@ -1,4 +1,5 @@
 import { evaluateWalletRequest } from "./guard.js";
+import { NonceRetryNeeded } from "./rpc.js";
 import type {
   AttemptLog,
   AttemptStatus,
@@ -22,6 +23,7 @@ export type PipelineDeps = {
   rpc: {
     getTransactionCount: (address: string, tag: "pending") => Promise<number>;
     gasPrice: () => Promise<bigint>;
+    sendRawTransaction: (signed: string) => Promise<string>;
     sendRawTransactionWithNonceRetry: (
       signed: string,
       fromAddress: string,
@@ -111,7 +113,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
     return { ok: false, errorCode: 4001, reason: decision.reason };
   }
 
-  const signed = await input.wallet.signTransaction({
+  let signed = await input.wallet.signTransaction({
     to: to as string,
     data: dataHex,
     value,
@@ -123,13 +125,32 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
 
   const inflightKey = `${nonce}-${actionFingerprint ?? "nofp"}`;
   try {
-    const { txHash } = await withInflight(inflightKey, () =>
-      input.rpc.sendRawTransactionWithNonceRetry(signed, input.wallet.address as string),
-    );
+    let result: { txHash: string; refetchedNonce: number | null };
+    try {
+      result = await withInflight(inflightKey, () =>
+        input.rpc.sendRawTransactionWithNonceRetry(signed, input.wallet.address as string),
+      );
+    } catch (err) {
+      if (!(err instanceof NonceRetryNeeded)) throw err;
+      const retrySigned = await input.wallet.signTransaction({
+        to: to as string,
+        data: dataHex,
+        value,
+        nonce: err.refetchedNonce,
+        gasLimit: FALLBACK_GAS_LIMIT,
+        gasPrice,
+        chainId: input.config.chainId,
+      });
+      const retryTxHash = await withInflight(
+        `${err.refetchedNonce}-${actionFingerprint ?? "nofp"}`,
+        () => input.rpc.sendRawTransaction(retrySigned),
+      );
+      result = { txHash: retryTxHash, refetchedNonce: err.refetchedNonce };
+    }
     await input.log.append(
-      makeLog({ status: "signed", reason: decision.reason, walletRequest, decision, txHash }),
+      makeLog({ status: "signed", reason: decision.reason, walletRequest, decision, txHash: result.txHash }),
     );
-    return { ok: true, txHash };
+    return { ok: true, txHash: result.txHash };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     await input.log.append(makeLog({ status: "rpc_failed", reason, walletRequest, decision }));

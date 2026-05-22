@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { RpcClient } from "../src/background/rpc.js";
+import { RpcClient, NonceRetryNeeded } from "../src/background/rpc.js";
 
 function fetchReturning(responses: Array<{ status: number; body: unknown }>): typeof fetch {
   let index = 0;
@@ -70,14 +70,12 @@ describe("rpc", () => {
     expect(await client.gasPrice()).toBe(1_000_000_000n);
   });
 
-  it("refetches nonce and retries once on nonce-too-low", async () => {
+  it("throws NonceRetryNeeded with refetched nonce on nonce-too-low", async () => {
     const fetchFn = vi.fn() as unknown as typeof fetch;
-    const calls: Array<{ method: string; body: any }> = [];
     (fetchFn as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       async (_input: string, init?: RequestInit) => {
         const body = JSON.parse(String(init?.body ?? "{}"));
-        calls.push({ method: body.method, body });
-        if (body.method === "eth_sendRawTransaction" && calls.filter((c) => c.method === "eth_sendRawTransaction").length === 1) {
+        if (body.method === "eth_sendRawTransaction") {
           return new Response(
             JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "nonce too low" } }),
             { status: 200 },
@@ -91,11 +89,15 @@ describe("rpc", () => {
     );
 
     const client = new RpcClient("https://rpc.example", fetchFn);
-    const result = await client.sendRawTransactionWithNonceRetry(
-      "0xdeadbeef",
-      "0xfrom",
-    );
-    expect(result.txHash).toBe("0xnew");
-    expect(result.refetchedNonce).toBe(5);
+    await expect(
+      client.sendRawTransactionWithNonceRetry("0xdeadbeef", "0xfrom"),
+    ).rejects.toThrow(NonceRetryNeeded);
+
+    // Verify the refetched nonce is correct
+    const caughtError = await client
+      .sendRawTransactionWithNonceRetry("0xdeadbeef", "0xfrom")
+      .catch((e) => e);
+    expect(caughtError).toBeInstanceOf(NonceRetryNeeded);
+    expect((caughtError as NonceRetryNeeded).refetchedNonce).toBe(5);
   });
 });

@@ -27,11 +27,7 @@ export class RpcClient {
     } catch (error) {
       if (!isNonceTooLow(error)) throw error;
       const refetchedNonce = await this.getTransactionCount(fromAddress, "pending");
-      // Re-attempt once with the same signed tx after refetching the nonce.
-      // The caller is responsible for re-signing with the new nonce if needed;
-      // this retry satisfies the pipeline's optimistic-retry contract.
-      const txHash = await this.sendRawTransaction(signed);
-      return { txHash, refetchedNonce };
+      throw new NonceRetryNeeded(refetchedNonce);
     }
   }
 
