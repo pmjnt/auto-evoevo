@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<title>Auto EvoEvo Extension — Thiết kế (Tiếng Việt)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1c2230;
+    --ink: #e6e9ef;
+    --muted: #8a93a6;
+    --line: #2a3142;
+    --accent: #7aa2f7;
+    --ok: #9ece6a;
+    --warn: #e0af68;
+    --bad: #f7768e;
+    --info: #7dcfff;
+    --code-bg: #11141b;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 28px 96px; }
+  header.title {
+    border-left: 4px solid var(--accent);
+    padding: 4px 16px;
+    margin-bottom: 8px;
+  }
+  header.title h1 { margin: 0; font-size: 28px; letter-spacing: -0.3px; }
+  header.title .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  h2 {
+    margin-top: 56px;
+    font-size: 22px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    letter-spacing: -0.2px;
+  }
+  h3 { margin-top: 32px; font-size: 17px; color: var(--ink); }
+  h4 { margin: 18px 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  p, li { font-size: 15px; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 16px 0;
+  }
+  .panel.note {
+    border-left: 3px solid var(--info);
+    background: rgba(125,207,255,0.04);
+  }
+  .panel.warn {
+    border-left: 3px solid var(--warn);
+    background: rgba(224,175,104,0.05);
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .pill.ok { color: var(--ok); border-color: rgba(158,206,106,0.4); }
+  .pill.bad { color: var(--bad); border-color: rgba(247,118,142,0.4); }
+  .pill.warn { color: var(--warn); border-color: rgba(224,175,104,0.4); }
+  .pill.info { color: var(--info); border-color: rgba(125,207,255,0.4); }
+  .toc { background: var(--panel-2); border-left: 3px solid var(--accent); padding: 12px 18px; border-radius: 0 10px 10px 0; }
+  .toc ol { margin: 0; padding-left: 22px; }
+  .toc a { color: var(--ink); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+
+  /* Mockup */
+  .mockup {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mockup .frame {
+    background: #1a1f2b;
+    border: 1px solid #2a3142;
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    overflow: hidden;
+  }
+  .mockup .caption {
+    color: var(--muted); font-size: 12px; text-align: center;
+  }
+  .popup {
+    width: 340px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .popup .pop-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    background: #11141b;
+  }
+  .popup .logo {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: linear-gradient(135deg, #7aa2f7, #bb9af7);
+  }
+  .popup .pop-title { font-size: 13px; font-weight: 600; }
+  .popup .pop-body { padding: 14px; }
+  .popup .pop-body label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .popup .input {
+    width: 100%; padding: 8px 10px;
+    background: #0e1219; border: 1px solid #2a3142; color: var(--ink);
+    border-radius: 6px; font-size: 13px;
+  }
+  .popup .btn {
+    display: inline-block; padding: 8px 12px; border-radius: 6px;
+    background: var(--accent); color: #0b0e14; font-size: 13px;
+    font-weight: 600; border: none; cursor: pointer;
+  }
+  .popup .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .popup .btn.danger { background: var(--bad); color: #1a0d10; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row.between { justify-content: space-between; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 13px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { color: var(--ink); font-family: ui-monospace, monospace; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-right: 6px;
+  }
+  .status-dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .status-dot.paused { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .status-dot.locked { background: var(--bad); }
+  .log-line {
+    font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.6;
+    padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.05);
+    color: var(--muted);
+  }
+  .log-line .t { color: #586478; margin-right: 6px; }
+  .log-line .s-signed { color: var(--ok); }
+  .log-line .s-dry { color: var(--info); }
+  .log-line .s-manual { color: var(--warn); }
+  .log-line .s-rejected { color: var(--bad); }
+
+  .compare-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .compare-card h4 { color: var(--ink); margin-top: 0; text-transform: none; letter-spacing: 0; font-size: 15px; }
+  .compare-card ul { margin: 6px 0 0 0; padding-left: 18px; font-size: 13px; }
+
+  .diagram-host { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 16px 0; }
+  .diagram-host svg { width: 100%; height: auto; display: block; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 14px; color: var(--muted); font-size: 12px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .legend .l-page::before { background: #364774; }
+  .legend .l-bg::before { background: #4a3b6e; }
+  .legend .l-ui::before { background: #345c4a; }
+  .legend .l-rpc::before { background: #6e4036; }
+
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+
+  .term {
+    border-bottom: 1px dotted var(--muted);
+    cursor: help;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title">
+  <h1>Auto EvoEvo Extension — Thiết kế</h1>
+  <div class="meta">
+    Ngày: 2026-05-22 · Thay Playwright/CDP runner bằng một extension Chrome (MV3).
+    Extension đóng vai trò ví ngay trên trang <code>evoevo.ai</code>, không cần Rabby cho site này.
+  </div>
+</header>
+
+<div class="panel note">
+  <strong>Đọc nhanh:</strong> Hiện tại bạn đang chạy một process Node + Playwright, mở Chrome riêng,
+  đọc text trong popup Rabby để biết bạn đang ký gì. Cách mới: cài 1 extension vào Chrome thường,
+  extension này <em>là ví</em> — nó nhận giao dịch trực tiếp từ EvoEvo (object có sẵn các trường
+  <code>to</code>, <code>data</code>, <code>value</code>, <code>gas</code>), kiểm tra theo guard,
+  rồi ký bằng key đã unlock và đẩy thẳng lên RPC 0G. Không cần Rabby, không cần đọc text.
+</div>
+
+<div class="toc panel">
+  <strong>Mục lục</strong>
+  <ol>
+    <li><a href="#goal">Mục tiêu &amp; phạm vi</a></li>
+    <li><a href="#compare">So sánh cách cũ vs cách mới</a></li>
+    <li><a href="#architecture">Kiến trúc</a></li>
+    <li><a href="#flow">Luồng dữ liệu cho 1 lần ADD TO MEMORY</a></li>
+    <li><a href="#components">Module &amp; cấu trúc thư mục</a></li>
+    <li><a href="#ui">Mockup giao diện</a></li>
+    <li><a href="#states">Máy trạng thái của automation</a></li>
+    <li><a href="#errors">Xử lý lỗi</a></li>
+    <li><a href="#tests">Chiến lược test</a></li>
+    <li><a href="#open">Câu hỏi cần xác nhận lúc làm</a></li>
+    <li><a href="#accept">Tiêu chí nghiệm thu</a></li>
+  </ol>
+</div>
+
+<h2 id="goal">1. Mục tiêu &amp; phạm vi</h2>
+<div class="panel">
+  <h4>Mục tiêu</h4>
+  <ul>
+    <li>Tự bấm <code>ADD TO MEMORY</code> và <code>SHOW MORE</code> trên <code>https://evoevo.ai/feed</code>.</li>
+    <li>Thay Rabby trên site này: extension cung cấp <code>window.ethereum</code> (chuẩn EIP-1193) cho trang EvoEvo dùng.</li>
+    <li>Mỗi <code>eth_sendTransaction</code> đều phải qua guard hiện có; nếu pass thì ký tại chỗ bằng key đã unlock (lưu mã hoá).</li>
+    <li>Bất kỳ tình huống nào không chắc chắn ⇒ <b>pause, không ký</b>. Lý do hiển thị trên popup.</li>
+  </ul>
+  <h4>Không làm trong phiên bản này</h4>
+  <ul>
+    <li>Đẩy lên Chrome Web Store.</li>
+    <li>Hỗ trợ ví khác (WalletConnect, ví cứng, MetaMask Snap).</li>
+    <li>Hỗ trợ chain khác ngoài 0G.</li>
+    <li>Reverse-engineer ABI của contract EvoEvo. Mình coi <code>data</code> là bytes thô,
+        chỉ kiểm bằng whitelist <em>function selector</em> (4 byte đầu).</li>
+  </ul>
+</div>
+
+<h2 id="compare">2. So sánh cách cũ vs cách mới</h2>
+<div class="grid-2">
+  <div class="compare-card">
+    <h4>Hiện tại — Playwright/CDP runner <span class="pill">đang dùng</span></h4>
+    <ul>
+      <li>Có process Node chạy nền, Playwright mở 1 Chrome profile <em>riêng</em>.</li>
+      <li>Đọc popup Rabby bằng <code>innerText</code> rồi parse text bằng regex.</li>
+      <li>Các trường guard (origin, chain, contract, fee) đều <em>suy ra từ text</em> — dễ lệch khi Rabby đổi UI.</li>
+      <li>Gặp bất thường thì dừng; muốn tiếp phải restart cả process.</li>
+      <li>Lụy: cần Node, cần profile riêng, lệ thuộc Rabby UI.</li>
+    </ul>
+  </div>
+  <div class="compare-card" style="border-color: rgba(122,162,247,0.5);">
+    <h4>Đề xuất — Extension MV3 <span class="pill info">mới</span></h4>
+    <ul>
+      <li>Cài vào Chrome bình thường của bạn — không cần profile riêng, không cần Node.</li>
+      <li>Extension <em>chính là ví</em>: nhận thẳng object giao dịch (<code>to, data, value, gas</code>).</li>
+      <li>Guard chạy trên object đã typed — không parse text, không phụ thuộc Rabby.</li>
+      <li>Pause/resume ngay trong popup. Key chỉ giữ trong RAM khi đã unlock.</li>
+      <li>Đánh đổi: phải tự implement EIP-1193 cỡ tối thiểu; user tắt Rabby trên site này.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="architecture">3. Kiến trúc</h2>
+<p>
+  Extension gồm <b>4 nơi chạy code</b> tách biệt, chỉ nói chuyện với nhau qua message có schema rõ ràng.
+  Mỗi nơi 1 việc, không ai biết internals của ai.
+</p>
+
+<div class="panel note">
+  <strong>Giải thích nhanh các khái niệm Chrome extension:</strong>
+  <ul style="margin: 8px 0 0 0;">
+    <li><b>Main world</b>: chạy chung với JS của trang EvoEvo, thấy được <code>window</code> của trang.
+        Đây là chỗ duy nhất có thể gán <code>window.ethereum</code> cho EvoEvo thấy.
+        Nhưng main world <b>không có quyền</b> gọi API <code>chrome.*</code>.</li>
+    <li><b>Isolated world</b>: cũng chạy trong tab EvoEvo, thấy DOM, nhưng <em>không</em> share biến với trang.
+        Có quyền gọi <code>chrome.runtime</code>, <code>chrome.storage</code>... → đây là nơi tốt để bắc cầu.</li>
+    <li><b>Service worker (background)</b>: chạy nền, không gắn với tab. Đây là nơi giữ private key
+        sau khi unlock, chạy guard, ký, gọi RPC. Chrome có thể tự kill service worker khi rảnh —
+        thiết kế phải tính tới chuyện này.</li>
+    <li><b>Popup / Options</b>: UI thuần HTML, hiện khi user bấm icon extension. Gọi background qua message.</li>
+  </ul>
+</div>
+
+<div class="legend">
+  <span class="l-page">Tab EvoEvo (trang)</span>
+  <span class="l-bg">Background (service worker)</span>
+  <span class="l-ui">UI của extension</span>
+  <span class="l-rpc">RPC bên ngoài / chain</span>
+</div>
+<div class="diagram-host">
+<svg viewBox="0 0 980 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ kiến trúc">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a93a6"/>
+    </marker>
+    <style>
+      .box { fill: #1c2230; stroke: #2a3142; stroke-width: 1; rx: 10; }
+      .box.page { fill: #1c243a; stroke: #3a4a78; }
+      .box.bg { fill: #251e36; stroke: #4a3b6e; }
+      .box.ui { fill: #1a2a23; stroke: #345c4a; }
+      .box.rpc { fill: #2a1c18; stroke: #6e4036; }
+      .lbl { fill: #e6e9ef; font: 13px ui-sans-serif, sans-serif; }
+      .lbl.sm { font-size: 11px; fill: #8a93a6; }
+      .lbl.t { font-weight: 700; }
+      .edge { stroke: #8a93a6; stroke-width: 1.4; fill: none; }
+      .edge.dash { stroke-dasharray: 4 4; }
+      .edge-lbl { fill: #8a93a6; font: 11px ui-monospace, monospace; }
+    </style>
+  </defs>
+
+  <rect class="box page" x="20" y="20" width="540" height="220" />
+  <text class="lbl t" x="40" y="46">Tab evoevo.ai/feed</text>
+
+  <rect class="box" x="50" y="70" width="220" height="150" rx="8" />
+  <text class="lbl t" x="64" y="92">inpage/provider.ts</text>
+  <text class="lbl sm" x="64" y="110">main world</text>
+  <text class="lbl sm" x="64" y="134">• cung cấp window.ethereum</text>
+  <text class="lbl sm" x="64" y="150">• request() / events</text>
+  <text class="lbl sm" x="64" y="166">• thông báo EIP-6963</text>
+  <text class="lbl sm" x="64" y="190">cầu postMessage ↓</text>
+
+  <rect class="box" x="310" y="70" width="230" height="150" rx="8" />
+  <text class="lbl t" x="324" y="92">content/*</text>
+  <text class="lbl sm" x="324" y="110">isolated world</text>
+  <text class="lbl sm" x="324" y="134">• inject inpage lúc document_start</text>
+  <text class="lbl sm" x="324" y="150">• cầu postMessage ↔ runtime</text>
+  <text class="lbl sm" x="324" y="166">• tự click ADD TO MEMORY</text>
+  <text class="lbl sm" x="324" y="182">• click SHOW MORE</text>
+  <text class="lbl sm" x="324" y="198">• máy trạng thái automation</text>
+
+  <line class="edge dash" x1="270" y1="145" x2="310" y2="145" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl" x="245" y="138">postMessage</text>
+
+  <rect class="box bg" x="620" y="20" width="340" height="220" />
+  <text class="lbl t" x="640" y="46">background/ (service worker)</text>
+  <text class="lbl sm" x="640" y="70">• điều phối message</text>
+  <text class="lbl sm" x="640" y="86">• wallet (key trong RAM)</text>
+  <text class="lbl sm" x="640" y="102">• pipeline (guard + ký + broadcast)</text>
+  <text class="lbl sm" x="640" y="118">• client RPC 0G</text>
+  <text class="lbl sm" x="640" y="134">• session log + badge</text>
+  <text class="lbl sm" x="640" y="158">verify origin qua sender.tab.url</text>
+  <text class="lbl sm" x="640" y="174">tái sử dụng src/guard.ts</text>
+  <text class="lbl sm" x="640" y="190">key KHÔNG rời khỏi hộp này</text>
+
+  <line class="edge" x1="540" y1="145" x2="620" y2="145" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl" x="546" y="138">chrome.runtime.sendMessage</text>
+
+  <rect class="box ui" x="620" y="290" width="160" height="120" />
+  <text class="lbl t" x="640" y="316">popup.html</text>
+  <text class="lbl sm" x="640" y="336">unlock / trạng thái</text>
+  <text class="lbl sm" x="640" y="352">start · pause · resume</text>
+  <text class="lbl sm" x="640" y="368">xem log · export</text>
+
+  <rect class="box ui" x="800" y="290" width="160" height="120" />
+  <text class="lbl t" x="820" y="316">options.html</text>
+  <text class="lbl sm" x="820" y="336">whitelist contract</text>
+  <text class="lbl sm" x="820" y="352">function selector</text>
+  <text class="lbl sm" x="820" y="368">RPC + fee cap</text>
+  <text class="lbl sm" x="820" y="384">wizard import key</text>
+
+  <line class="edge" x1="700" y1="290" x2="780" y2="240" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <line class="edge" x1="880" y1="290" x2="850" y2="240" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl" x="690" y="270">messages.ts (typed)</text>
+
+  <rect class="box rpc" x="620" y="450" width="340" height="60" />
+  <text class="lbl t" x="640" y="476">JSON-RPC endpoint của 0G</text>
+  <text class="lbl sm" x="640" y="494">eth_sendRawTransaction, gasPrice, getTransactionCount …</text>
+  <line class="edge" x1="780" y1="240" x2="780" y2="450" marker-end="url(#arrow)"/>
+  <text class="edge-lbl" x="788" y="350">fetch() (HTTPS)</text>
+
+  <rect class="box" x="20" y="290" width="540" height="120" />
+  <text class="lbl t" x="40" y="316">chrome.storage</text>
+  <text class="lbl sm" x="40" y="336">local: vault mã hoá, config, session log (cap 1000 entries)</text>
+  <text class="lbl sm" x="40" y="352">session: state của tx đang in-flight (sống qua SW restart, chết khi đóng Chrome)</text>
+  <text class="lbl sm" x="40" y="376">vault không bao giờ rơi vào context inpage/content/page</text>
+  <line class="edge" x1="560" y1="350" x2="620" y2="170" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+</svg>
+</div>
+
+<h4>Vì sao chia 4 chỗ như vậy</h4>
+<ul>
+  <li><code>inpage</code> phải ở <b>main world</b> mới gán được <code>window.ethereum</code> cho EvoEvo thấy.
+      Nhưng main world không có <code>chrome.*</code> → phải nhờ <code>content</code> chuyển tiếp.</li>
+  <li><code>content</code> ở <b>isolated world</b>: vừa thấy DOM (để click button), vừa có quyền message lên background.</li>
+  <li><code>background</code> là <b>nơi duy nhất</b> chứa private key (đã decrypt) trong RAM service worker.
+      Mọi thứ liên quan đến ký nằm gọn ở đây.</li>
+  <li><code>popup</code>/<code>options</code> là HTML thuần, giao tiếp với background qua message — không bao giờ chạm trực tiếp vào key.</li>
+</ul>
+
+<h2 id="flow">4. Luồng dữ liệu — 1 lần bấm ADD TO MEMORY</h2>
+<p>Đây là chuỗi sự kiện từ lúc automation click button cho tới khi tx lên chain.</p>
+<div class="diagram-host">
+<svg viewBox="0 0 980 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ tuần tự">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7aa2f7"/>
+    </marker>
+    <style>
+      .lane { stroke: #2a3142; stroke-width: 1; }
+      .lane-h { fill: #1c2230; stroke: #2a3142; rx: 6; }
+      .h-text { fill: #e6e9ef; font: 12px ui-sans-serif, sans-serif; font-weight: 700; }
+      .step { fill: #7aa2f7; font: 11px ui-monospace, monospace; }
+      .msg { stroke: #7aa2f7; stroke-width: 1.4; fill: none; }
+      .msg.dash { stroke-dasharray: 4 4; }
+      .msg-lbl { fill: #e6e9ef; font: 11px ui-monospace, monospace; }
+      .note { fill: #1f2433; stroke: #3a4258; rx: 4; }
+      .note-text { fill: #c0c6d4; font: 10px ui-monospace, monospace; }
+    </style>
+  </defs>
+  <g>
+    <rect class="lane-h" x="30" y="20" width="140" height="26" /><text class="h-text" x="44" y="38">automation</text>
+    <rect class="lane-h" x="200" y="20" width="140" height="26" /><text class="h-text" x="226" y="38">trang EvoEvo</text>
+    <rect class="lane-h" x="370" y="20" width="140" height="26" /><text class="h-text" x="396" y="38">inpage/provider</text>
+    <rect class="lane-h" x="540" y="20" width="140" height="26" /><text class="h-text" x="566" y="38">content/index</text>
+    <rect class="lane-h" x="710" y="20" width="140" height="26" /><text class="h-text" x="724" y="38">background/pipeline</text>
+  </g>
+  <g>
+    <line class="lane" x1="100" y1="50" x2="100" y2="440"/>
+    <line class="lane" x1="270" y1="50" x2="270" y2="440"/>
+    <line class="lane" x1="440" y1="50" x2="440" y2="440"/>
+    <line class="lane" x1="610" y1="50" x2="610" y2="440"/>
+    <line class="lane" x1="780" y1="50" x2="780" y2="440"/>
+  </g>
+
+  <text class="step" x="36" y="78">1</text>
+  <line class="msg" x1="100" y1="80" x2="270" y2="80" marker-end="url(#arr2)"/>
+  <text class="msg-lbl" x="110" y="74">click() nút ADD TO MEMORY</text>
+
+  <text class="step" x="206" y="118">2</text>
+  <line class="msg" x1="270" y1="120" x2="440" y2="120" marker-end="url(#arr2)"/>
+  <text class="msg-lbl" x="278" y="114">ethereum.request(eth_sendTransaction, {to, data, value, gas})</text>
+
+  <text class="step" x="376" y="158">3</text>
+  <line class="msg dash" x1="440" y1="160" x2="610" y2="160" marker-end="url(#arr2)"/>
+  <text class="msg-lbl" x="448" y="154">postMessage({type:'rpc', id, method, params})</text>
+
+  <text class="step" x="546" y="198">4</text>
+  <line class="msg" x1="610" y1="200" x2="780" y2="200" marker-end="url(#arr2)"/>
+  <text class="msg-lbl" x="618" y="194">chrome.runtime.sendMessage</text>
+
+  <rect class="note" x="700" y="220" width="270" height="98"/>
+  <text class="note-text" x="710" y="238">5. trong background:</text>
+  <text class="note-text" x="710" y="254">  verify origin = evoevo.ai</text>
+  <text class="note-text" x="710" y="270">  lấy nonce + gas qua RPC</text>
+  <text class="note-text" x="710" y="286">  build WalletRequest từ params</text>
+  <text class="note-text" x="710" y="302">  guard.evaluate → approve | reject | review</text>
+  <text class="note-text" x="710" y="318">  nếu approve+!dryRun: ký + sendRawTransaction</text>
+
+  <text class="step" x="546" y="358">6</text>
+  <line class="msg" x1="780" y1="360" x2="610" y2="360" marker-end="url(#arr2)"/>
+  <text class="msg-lbl" x="620" y="354">{ok:true, txHash} hoặc lỗi 4001</text>
+
+  <text class="step" x="376" y="398">7</text>
+  <line class="msg dash" x1="610" y1="400" x2="440" y2="400" marker-end="url(#arr2)"/>
+  <line class="msg" x1="440" y1="420" x2="270" y2="420" marker-end="url(#arr2)"/>
+  <text class="msg-lbl" x="280" y="414">Promise resolve(txHash) → trang tiếp tục UI</text>
+</svg>
+</div>
+
+<h4>Vài quyết định quan trọng trong pipeline</h4>
+<ul>
+  <li><b>actionFingerprint = function selector</b> (4 byte đầu của <code>data</code>).
+      Bổ sung config <code>allowedFunctionSelectors: string[]</code>; guard reject nếu không khớp.
+      Cải tiến đáng kể so với hiện tại — thay vì đoán mò "Unknown Signature Type" trên Rabby,
+      mình có vân tay chính xác của function được gọi.</li>
+  <li><b>Guard thêm kiểm tra</b>: <code>data.length ≥ 4</code>, <code>value === 0n</code>, selector ∈ whitelist.
+      EvoEvo memory call không bao giờ chuyển native token và luôn có data.</li>
+  <li><b>Nonce và gas</b> đều do background tự fetch qua RPC, <em>không tin</em> giá trị do trang gửi.</li>
+  <li><b>Origin</b> verify bằng <code>sender.tab.url</code> (Chrome cung cấp, không bịa được),
+      <em>không tin</em> field origin do content-script tự khai.</li>
+  <li><b>Reject về EvoEvo luôn là code 4001</b> (chuẩn EIP-1193 "user rejected") —
+      không leak chi tiết guard reason ra trang. Chi tiết chỉ vào extension log + popup.</li>
+  <li><b>v1 chỉ ký <code>eth_sendTransaction</code></b>. Các method write khác
+      (<code>personal_sign</code>, <code>eth_sign</code>, <code>eth_signTypedData_*</code>,
+      <code>wallet_*</code>) trả code 4200 (unsupported). Nếu EvoEvo cần thêm method nào thì viết spec mới.</li>
+</ul>
+
+<h2 id="components">5. Module &amp; cấu trúc thư mục</h2>
+<pre>auto-evoevo-extension/
+├── manifest.json
+├── src/
+│   ├── inpage/provider.ts
+│   ├── content/{index,automation}.ts
+│   ├── background/{index,wallet,rpc,pipeline,guard,storage,session-log}.ts
+│   ├── ui/{popup,options}.{html,ts}
+│   ├── shared/{messages,types,crypto}.ts
+│   └── config/defaults.ts
+├── tests/{guard,crypto,wallet,rpc,messages,pipeline,automation}.test.ts
+├── tests/fixtures/{chrome-api.ts, dom/feed.html, tx-samples.json}
+├── vitest.config.ts
+├── tsconfig.json
+└── package.json</pre>
+
+<p>Repo hiện tại giữ nguyên Playwright runner trong <code>src/</code>. Extension nằm song song để 2 phiên bản cùng tồn tại trong lúc verify.</p>
+
+<table>
+<thead><tr><th>Module</th><th>Việc nó làm</th><th>Phụ thuộc gì</th></tr></thead>
+<tbody>
+<tr><td><code>inpage/provider.ts</code></td><td>Cung cấp EIP-1193: <code>request</code>, events, announce EIP-6963</td><td>main world (không có chrome.*)</td></tr>
+<tr><td><code>content/index.ts</code></td><td>Inject inpage lúc <code>document_start</code>; cầu postMessage ↔ runtime</td><td><code>chrome.runtime</code></td></tr>
+<tr><td><code>content/automation.ts</code></td><td>Máy trạng thái: tìm/click ADD TO MEMORY + SHOW MORE; dừng sau 2 lần idle</td><td>DOM only</td></tr>
+<tr><td><code>background/index.ts</code></td><td>Entry service worker, router, khôi phục inflight khi wake</td><td>messages, pipeline, wallet</td></tr>
+<tr><td><code>background/wallet.ts</code></td><td>Giữ key trong RAM sau unlock; <code>signTransaction</code>; idle-lock timer</td><td>crypto, storage</td></tr>
+<tr><td><code>background/pipeline.ts</code></td><td>Lấy nonce/gas → build WalletRequest → guard → ký → broadcast → log</td><td>wallet, rpc, guard, log</td></tr>
+<tr><td><code>background/guard.ts</code></td><td>Port <code>src/guard.ts</code> + check mới (value, data length, selector)</td><td>shared/types</td></tr>
+<tr><td><code>background/rpc.ts</code></td><td>Client RPC 0G; retry 5xx/timeout; nonce-too-low refetch+retry</td><td><code>fetch</code></td></tr>
+<tr><td><code>background/storage.ts</code></td><td>Wrapper <code>chrome.storage.local</code>/<code>.session</code> validate qua zod</td><td>—</td></tr>
+<tr><td><code>shared/crypto.ts</code></td><td>AES-GCM 256 + PBKDF2 (≥ 250k iter) từ master password</td><td>Web Crypto API</td></tr>
+<tr><td><code>shared/messages.ts</code></td><td>Discriminated union + zod schema cho mọi loại message</td><td>zod</td></tr>
+<tr><td><code>shared/types.ts</code></td><td>Port <code>src/types.ts</code>; thêm <code>txHash</code> + mở rộng AttemptStatus</td><td>—</td></tr>
+</tbody></table>
+
+<h2 id="ui">6. Mockup giao diện</h2>
+<p>4 màn hình chính của extension. Click vào icon extension trên thanh Chrome sẽ hiện popup; bấm "Options" hiện trang config.</p>
+<div class="grid-2">
+
+  <div class="mockup">
+    <div class="frame">
+      <div class="popup">
+        <div class="pop-head">
+          <div class="logo"></div>
+          <div class="pop-title">Auto EvoEvo</div>
+          <div style="flex:1"></div>
+          <span class="pill bad"><span class="status-dot locked"></span>khoá</span>
+        </div>
+        <div class="pop-body">
+          <p style="margin:0 0 12px; color: var(--muted); font-size: 12px;">
+            Vault đang khoá. Nhập master password để unlock cho session này.
+          </p>
+          <label>Master password</label>
+          <input class="input" type="password" value="••••••••••" />
+          <div style="height:10px"></div>
+          <div class="row between">
+            <span class="pill">tự khoá lại: 30 phút</span>
+            <button class="btn">Unlock</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">Popup — đang khoá</div>
+  </div>
+
+  <div class="mockup">
+    <div class="frame">
+      <div class="popup">
+        <div class="pop-head">
+          <div class="logo"></div>
+          <div class="pop-title">Auto EvoEvo</div>
+          <div style="flex:1"></div>
+          <span class="pill ok"><span class="status-dot ok"></span>đang chạy</span>
+        </div>
+        <div class="pop-body">
+          <div class="kv">
+            <div class="k">Địa chỉ</div><div class="v">0x4f…a2d1</div>
+            <div class="k">Chain</div><div class="v">0G (id 16661)</div>
+            <div class="k">Đã ký</div><div class="v" style="color: var(--ok)">12</div>
+            <div class="k">Dry-run</div><div class="v">0</div>
+            <div class="k">Cần review</div><div class="v" style="color: var(--warn)">1</div>
+            <div class="k">Bị reject</div><div class="v" style="color: var(--bad)">0</div>
+          </div>
+          <div style="height: 10px"></div>
+          <div class="row between">
+            <button class="btn ghost">Tạm dừng</button>
+            <button class="btn">Mở feed</button>
+          </div>
+          <div style="height: 12px"></div>
+          <h4 style="margin: 0 0 4px; text-transform: uppercase; font-size: 11px;">Gần đây</h4>
+          <div class="log-line"><span class="t">14:02:11</span><span class="s-signed">signed</span> 0xab…91 · sel 0xd0e30db0</div>
+          <div class="log-line"><span class="t">14:02:08</span><span class="s-signed">signed</span> 0x9c…42 · sel 0xd0e30db0</div>
+          <div class="log-line"><span class="t">14:02:04</span><span class="s-manual">manual</span> selector không khớp whitelist</div>
+          <div class="log-line"><span class="t">14:01:58</span><span class="s-signed">signed</span> 0x71…03 · sel 0xd0e30db0</div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">Popup — đã unlock &amp; đang chạy</div>
+  </div>
+
+  <div class="mockup">
+    <div class="frame">
+      <div class="popup">
+        <div class="pop-head">
+          <div class="logo"></div>
+          <div class="pop-title">Auto EvoEvo</div>
+          <div style="flex:1"></div>
+          <span class="pill warn"><span class="status-dot paused"></span>tạm dừng</span>
+        </div>
+        <div class="pop-body">
+          <div style="background: rgba(224,175,104,0.08); border: 1px solid rgba(224,175,104,0.25); padding: 10px; border-radius: 6px;">
+            <div style="font-size: 12px; color: var(--warn); font-weight: 700;">Guard: cần review thủ công</div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">
+              Function selector <code>0xa9059cbb</code> không nằm trong whitelist.
+              Lần gần nhất: 14:03:22.
+            </div>
+          </div>
+          <div style="height: 10px"></div>
+          <div class="row between">
+            <button class="btn ghost">Bỏ qua card này</button>
+            <button class="btn">Resume</button>
+          </div>
+          <div style="height: 8px"></div>
+          <div class="row between" style="font-size: 11px; color: var(--muted);">
+            <span>Tx params đầy đủ ở console.</span>
+            <a href="#" style="color: var(--info)">Mở log</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">Popup — đang pause do guard</div>
+  </div>
+
+  <div class="mockup">
+    <div class="frame">
+      <div class="popup" style="width: 380px;">
+        <div class="pop-head">
+          <div class="logo"></div>
+          <div class="pop-title">Options</div>
+        </div>
+        <div class="pop-body">
+          <label>0G RPC URL</label>
+          <input class="input" value="https://rpc.0g.example" />
+          <div style="height: 8px"></div>
+          <div class="row" style="gap: 8px;">
+            <div style="flex:1;">
+              <label>Chain id</label>
+              <input class="input" value="16661" />
+            </div>
+            <div style="flex:1;">
+              <label>Fee tối đa (OG)</label>
+              <input class="input" value="0.001" />
+            </div>
+          </div>
+          <div style="height: 8px"></div>
+          <label>Contract được phép gọi</label>
+          <input class="input" value="0x61bb710000000000000000000000000000e937f9" />
+          <div style="height: 8px"></div>
+          <label>Function selector được phép</label>
+          <input class="input" value="0xd0e30db0, 0x12345678" />
+          <div style="height: 8px"></div>
+          <div class="row between">
+            <button class="btn danger">Xoá vault</button>
+            <button class="btn">Lưu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">Options — cấu hình</div>
+  </div>
+
+</div>
+
+<h2 id="states">7. Máy trạng thái của automation</h2>
+<p>
+  Đây là vòng đời của 1 session automation. Mọi sự cố guard/network/DOM đều đưa về <span class="pill warn">paused</span>,
+  user resume từ popup. Hết button + 2 lần SHOW MORE không nạp thêm gì ⇒ <span class="pill ok">done</span>.
+</p>
+<div class="diagram-host">
+<svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="State machine">
+  <defs>
+    <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9ece6a"/>
+    </marker>
+    <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f7768e"/>
+    </marker>
+    <style>
+      .st { fill: #1c2230; stroke: #2a3142; stroke-width: 1.4; rx: 26; }
+      .st.bad { stroke: #f7768e; }
+      .st.terminal { fill: #1a2a23; stroke: #345c4a; }
+      .lbl3 { fill: #e6e9ef; font: 13px ui-sans-serif, sans-serif; font-weight: 600; }
+      .e { stroke: #9ece6a; stroke-width: 1.4; fill: none; }
+      .e.bad { stroke: #f7768e; }
+      .e-lbl { fill: #c0c6d4; font: 11px ui-monospace, monospace; }
+    </style>
+  </defs>
+
+  <rect class="st" x="40" y="60" width="120" height="50"/>
+  <text class="lbl3" x="78" y="92">idle</text>
+  <rect class="st" x="230" y="60" width="140" height="50"/>
+  <text class="lbl3" x="266" y="92">clicking</text>
+  <rect class="st" x="440" y="60" width="160" height="50"/>
+  <text class="lbl3" x="476" y="92">waiting-tx</text>
+  <rect class="st" x="670" y="60" width="140" height="50"/>
+  <text class="lbl3" x="710" y="92">post-tx</text>
+
+  <rect class="st terminal" x="670" y="240" width="140" height="50"/>
+  <text class="lbl3" x="722" y="272">done</text>
+  <rect class="st bad" x="270" y="240" width="160" height="50"/>
+  <text class="lbl3" x="318" y="272">paused</text>
+
+  <line class="e" x1="160" y1="85" x2="230" y2="85" marker-end="url(#arr3)"/>
+  <text class="e-lbl" x="166" y="76">thấy button</text>
+  <line class="e" x1="370" y1="85" x2="440" y2="85" marker-end="url(#arr3)"/>
+  <text class="e-lbl" x="378" y="76">click()</text>
+  <line class="e" x1="600" y1="85" x2="670" y2="85" marker-end="url(#arr3)"/>
+  <text class="e-lbl" x="606" y="76">resolve(txHash)</text>
+  <path class="e" d="M740 110 C 740 180, 200 180, 100 110" marker-end="url(#arr3)"/>
+  <text class="e-lbl" x="380" y="170">loop: button kế</text>
+  <line class="e" x1="740" y1="110" x2="740" y2="240" marker-end="url(#arr3)"/>
+  <text class="e-lbl" x="748" y="180">hết button + 2× idle</text>
+
+  <line class="e bad" x1="520" y1="110" x2="380" y2="240" marker-end="url(#arr4)"/>
+  <text class="e-lbl" x="380" y="200">4001 / timeout / rpc lỗi</text>
+  <line class="e bad" x1="300" y1="110" x2="320" y2="240" marker-end="url(#arr4)"/>
+  <text class="e-lbl" x="170" y="240">DOM rớt</text>
+
+  <path class="e" d="M270 270 C 200 270, 200 90, 100 90" marker-end="url(#arr3)" stroke-dasharray="5 4"/>
+  <text class="e-lbl" x="140" y="266">user resume</text>
+</svg>
+</div>
+
+<h2 id="errors">8. Xử lý lỗi</h2>
+<p>Bảng các tình huống có thể xảy ra và cách extension phản ứng. Nguyên tắc xuyên suốt: <b>không chắc thì pause, không tự ý ký</b>.</p>
+<table>
+<thead><tr><th>Tình huống</th><th>Phát hiện ở</th><th>Xử lý</th></tr></thead>
+<tbody>
+<tr><td>Vault chưa unlock khi có tx đến</td><td><code>wallet.ts</code></td><td>Reject 4100. Background mở popup để user nhập password. Automation pause.</td></tr>
+<tr><td>Origin không phải <code>evoevo.ai</code></td><td><code>pipeline.ts</code> (sender.tab.url)</td><td>Reject 4001; log <span class="pill bad">rejected_origin</span>. Đây là lớp phòng thủ dư.</td></tr>
+<tr><td>Guard <code>reject</code></td><td>pipeline</td><td>Reject 4001; log <span class="pill bad">rejected</span>; pause.</td></tr>
+<tr><td>Guard <code>needs_manual_review</code></td><td>pipeline</td><td>Tương tự reject nhưng log <span class="pill warn">manual_review</span>.</td></tr>
+<tr><td><code>data.length &lt; 4</code> hoặc <code>value &gt; 0n</code></td><td>guard</td><td>Reject. EvoEvo không bao giờ gửi tx như vậy.</td></tr>
+<tr><td>Function selector không trong whitelist</td><td>guard</td><td>Reject. Có thể EvoEvo đã đổi function — cần review.</td></tr>
+<tr><td>Fee &gt; cap</td><td>guard</td><td>Reject.</td></tr>
+<tr><td>RPC 5xx / timeout</td><td><code>rpc.ts</code></td><td>Retry 3 lần (backoff 500/1500/4500 ms), sau đó log <span class="pill bad">rpc_failed</span> và pause.</td></tr>
+<tr><td>Nonce quá thấp</td><td>rpc khi broadcast</td><td>Lấy lại nonce pending, retry 1 lần. Còn fail thì pause.</td></tr>
+<tr><td>Tab đóng giữa flow</td><td>content/automation</td><td>Background nhận disconnect → bỏ nếu chưa broadcast.</td></tr>
+<tr><td>SW bị Chrome kill <em>trước</em> broadcast</td><td>cơ chế MV3</td><td>Promise của trang timeout. Không có inflight để replay.</td></tr>
+<tr><td>SW bị kill <em>sau</em> broadcast</td><td>cơ chế MV3</td><td>Inflight key <code>(nonce, hash(data))</code> trong <code>chrome.storage.session</code>. Khi wake thì poll receipt để reconcile log.</td></tr>
+<tr><td>Sai password</td><td>wallet</td><td>AES-GCM decrypt throw → <code>{ok:false}</code>. Coi máy local là tin được, không lockout.</td></tr>
+<tr><td>Tx revert on-chain</td><td>rpc poll receipt</td><td>Log <span class="pill bad">reverted</span>; pause để user kiểm tra.</td></tr>
+</tbody></table>
+
+<h4>Chống ký trùng (idempotency)</h4>
+<ul>
+  <li>Marker <code>data-auto-evoevo-attempted-id</code> ngăn click lại cùng 1 button (mượn từ <code>controller.ts:5</code>).</li>
+  <li>Entry <code>inflight</code> key bằng <code>(nonce, keccak(data))</code>. Khi SW wake mà thấy entry chưa có receipt → poll receipt, không ký lại.</li>
+</ul>
+
+<h2 id="tests">9. Chiến lược test</h2>
+<p>Test theo boundary của từng module để đổi internals không phá test. Không chạy browser thật trong CI — chỉ unit + integration với fakes; manual smoke test trên Chrome lần cuối.</p>
+<div class="grid-3">
+  <div class="panel"><h4>Unit</h4><ul>
+    <li><code>guard</code> — port test cũ + check mới</li>
+    <li><code>crypto</code> — round-trip, sai password, IV random</li>
+    <li><code>wallet</code> — locked/unlock, idle-lock với fake timer</li>
+    <li><code>rpc</code> — retry/backoff, nonce-too-low</li>
+    <li><code>messages</code> — zod schema accept/reject</li>
+  </ul></div>
+  <div class="panel"><h4>Integration</h4><ul>
+    <li><code>pipeline</code> — fakes cho wallet/rpc/guard; verify gating</li>
+    <li><code>automation</code> — DOM fixture; pause khi 4001; skip button đã marker</li>
+    <li>Replay khi SW wake với inflight set</li>
+  </ul></div>
+  <div class="panel"><h4>Manual smoke</h4><ul>
+    <li>Load unpacked tại <code>chrome://extensions</code> → không lỗi</li>
+    <li>Import burner key 0G testnet → unlock</li>
+    <li>Dry-run ON: walk feed, log toàn <span class="pill info">dry_run</span></li>
+    <li>Dry-run OFF, 1 card: tx hiện trên explorer với <code>to</code> đúng, fee ≤ cap</li>
+    <li>Hạ cap thấp → pause với reason rõ</li>
+  </ul></div>
+</div>
+
+<h2 id="open">10. Câu hỏi cần xác nhận lúc làm</h2>
+<div class="panel warn">
+  <ul style="margin: 0;">
+    <li><b>Chain id và RPC URL của 0G</b> (mainnet vs testnet) — copy từ network của bạn đã add trong Rabby cho chắc, đừng đoán.</li>
+    <li><b>0G có hỗ trợ EIP-1559 chưa?</b> Nếu có: dùng <code>maxFeePerGas</code>/<code>maxPriorityFeePerGas</code>. Nếu chưa: legacy <code>gasPrice</code>.</li>
+    <li><b>EvoEvo có dispatch EIP-6963 không?</b> Nếu không, README hướng dẫn user tắt Rabby trên site này.</li>
+    <li><b>Function selector EvoEvo gọi là gì?</b> Lấy từ một tx thật trên explorer (field "Input Data") rồi seed vào <code>allowedFunctionSelectors</code>.</li>
+  </ul>
+</div>
+
+<h2 id="accept">11. Tiêu chí nghiệm thu</h2>
+<ul>
+  <li>Extension load vào Chrome MV3 không lỗi.</li>
+  <li>Dry-run ON: chạy hết feed, JSONL log tương thích shape <code>SessionLogger</code> hiện tại + thêm <code>txHash</code> và các status mới.</li>
+  <li>Dry-run OFF + 1 selector whitelist: mọi tx approved được ký + broadcast lên 0G; non-approve thì pause, không ký.</li>
+  <li>Guard dùng lại logic <code>src/guard.ts</code>; cùng <code>WalletRequest</code> ra cùng kết quả.</li>
+  <li>Private key không bao giờ rời <code>background/wallet.ts</code>; vault at rest mã hoá AES-GCM.</li>
+  <li>Tất cả unit + integration test pass với <code>vitest run</code>.</li>
+</ul>
+
+<hr/>
+<p style="color: var(--muted); font-size: 12px;">
+  File HTML này là bản tiếng Việt của
+  <code>2026-05-22-auto-evoevo-extension-design.md</code> để dễ đọc/giải thích.
+  File Markdown vẫn là <em>source of truth</em>.
+</p>
+
+</div>
+</body>
+</html>
