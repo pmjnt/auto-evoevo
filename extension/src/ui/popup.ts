@@ -1,8 +1,4 @@
-async function send(message: unknown): Promise<{ ok: boolean; [k: string]: unknown }> {
-  return await new Promise((resolve) => {
-    chrome.runtime.sendMessage(message, (response) => resolve(response as { ok: boolean }));
-  });
-}
+import { send } from "./shared.js";
 
 function show(id: "locked" | "unlocked"): void {
   document.getElementById("locked")?.classList.toggle("active", id === "locked");

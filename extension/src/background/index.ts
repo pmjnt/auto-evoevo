@@ -60,6 +60,14 @@ export async function handleMessage(
       await persistConfig(message.config);
       return { ok: true };
 
+    case "import-key": {
+      const { encryptVault } = await import("../shared/crypto.js");
+      const { setVault } = await import("./storage.js");
+      const vault = await encryptVault(message.privateKey, message.password);
+      await setVault(vault);
+      return { ok: true };
+    }
+
     case "rpc-request": {
       const origin = senderOrigin(sender);
       if (origin === null) {
