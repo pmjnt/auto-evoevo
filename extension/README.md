@@ -105,17 +105,13 @@ Hoặc disable Rabby toàn cục khi automation đang chạy (`chrome://extensio
 1. Mở tab `https://evoevo.ai/feed`. Đăng nhập nếu cần.
 2. Bấm icon extension → popup hiện form nhập password.
 3. Nhập master password đã set ở bước 3 → bấm **Unlock**.
-4. Popup chuyển sang trạng thái unlocked, hiện địa chỉ ví + counter `Signed/Dry-run/Manual/Rejected`.
-5. Mở DevTools console của tab EvoEvo (F12 → Console).
-6. Gõ vào console:
-   ```js
-   chrome.runtime.sendMessage('<EXTENSION_ID>', { type: 'start-automation' })
-   ```
-   Thay `<EXTENSION_ID>` bằng ID extension (xem ở `chrome://extensions`, dòng "ID: ...").
+4. Popup chuyển sang trạng thái unlocked, hiện địa chỉ ví + dòng **Status** + counter `Signed/Dry-run/Manual/Rejected`.
+5. Bấm **Start** trong popup. Dòng status chuyển sang `running` (màu xanh), và popup hiện `Started on N EvoEvo tab(s).` ở dưới.
 
-   > **Lưu ý:** v0.1.0 chưa có nút Start trong popup. Phải trigger từ console hoặc reload tab sau khi enable. Đây là known gap, sẽ thêm trong version sau.
+   > Nếu thấy `No evoevo.ai tab open`: mở `https://evoevo.ai/feed` trước, rồi bấm Start lại.
 
-7. Extension bắt đầu click ADD TO MEMORY. Trên popup, counter **Dry-run** tăng dần.
+6. Extension bắt đầu click ADD TO MEMORY. Trên popup, counter **Dry-run** tăng dần (auto-refresh 2s/lần).
+7. Muốn tạm dừng: bấm **Pause** — nút đổi thành **Resume**, status → `paused` (vàng). Bấm Resume tiếp tục.
 8. Mở Service Worker DevTools (`chrome://extensions` → Auto EvoEvo → "service worker" link) → Console hiển thị log entries:
    ```
    { status: "dry_run", reason: "Wallet request matches EvoEvo memory guardrails", ... }
@@ -223,12 +219,11 @@ Tab evoevo.ai           Service worker (background)
 
 Các điểm chưa hoàn thiện, ghi để bạn nắm:
 
-1. **Không có Start button trong popup.** Tạm thời trigger từ DevTools console (xem bước 5.6). Sẽ thêm UI button + cần thêm `tabs` permission.
-2. **`postMessage` dùng `"*"` targetOrigin** (defense-in-depth chưa tight). Risk thấp vì content vẫn filter qua field `source`.
-3. **Service worker bị Chrome kill khi rảnh.** Sau khi wake lại, vault locked → phải unlock lại. Inflight reconciliation đã có để không double-broadcast tx đã pending.
-4. **Manifest có `scripting` permission nhưng codebase chưa dùng.** Có thể xoá khi không cần.
-5. **Schema có `start`/`stop`/`export-log` nhưng router chưa wire.** Không gây lỗi, chỉ trả `Unhandled type`.
-6. **Chưa poll receipt trên 0G** sau khi broadcast — log entry `signed` ngay sau broadcast, không biết tx có revert on-chain hay không. Cần thêm task nếu muốn.
+1. **`postMessage` dùng `"*"` targetOrigin** (defense-in-depth chưa tight). Risk thấp vì content vẫn filter qua field `source`.
+2. **Service worker bị Chrome kill khi rảnh.** Sau khi wake lại, vault locked → phải unlock lại. Inflight reconciliation đã có để không double-broadcast tx đã pending.
+3. **Manifest có `scripting` permission nhưng codebase chưa dùng.** Có thể xoá khi không cần.
+4. **Schema có `export-log` nhưng router chưa wire.** Không gây lỗi, chỉ trả `Unhandled type`. (`start`/`stop` đã wire.)
+5. **Chưa poll receipt trên 0G** sau khi broadcast — log entry `signed` ngay sau broadcast, không biết tx có revert on-chain hay không. Cần thêm task nếu muốn.
 
 ---
 

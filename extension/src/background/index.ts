@@ -56,6 +56,16 @@ export async function handleMessage(
       paused = false;
       return { ok: true };
 
+    case "start": {
+      paused = false;
+      const tabsNotified = await broadcastStartToEvoEvoTabs();
+      return { ok: true, tabsNotified };
+    }
+
+    case "stop":
+      paused = true;
+      return { ok: true };
+
     case "set-config":
       await persistConfig(message.config);
       return { ok: true };
@@ -117,6 +127,22 @@ function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
   } catch {
     return null;
   }
+}
+
+async function broadcastStartToEvoEvoTabs(): Promise<number> {
+  if (typeof chrome === "undefined" || !chrome.tabs?.query) return 0;
+  const tabs = await chrome.tabs.query({ url: "https://evoevo.ai/*" });
+  let notified = 0;
+  for (const tab of tabs) {
+    if (tab.id === undefined) continue;
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: "start-automation" });
+      notified += 1;
+    } catch {
+      // tab without content script attached — ignore
+    }
+  }
+  return notified;
 }
 
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
