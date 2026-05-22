@@ -63,6 +63,7 @@ export class Wallet {
     if (this.signer === null) {
       throw new Error("Wallet is locked");
     }
+    this.armIdleTimer();
     return await this.signer.signTransaction({
       to: tx.to,
       data: tx.data,
