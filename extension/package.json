@@ -1,0 +1,23 @@
+{
+  "name": "auto-evoevo-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "node esbuild.config.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@types/node": "^20.14.2",
+    "esbuild": "^0.21.5",
+    "happy-dom": "^14.12.0",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
