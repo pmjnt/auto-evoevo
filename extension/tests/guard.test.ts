@@ -69,3 +69,35 @@ describe("guard — ported checks", () => {
     ).toBe("needs_manual_review");
   });
 });
+
+describe("guard — new checks", () => {
+  it("rejects when value is non-zero", () => {
+    expect(
+      evaluateWalletRequest({ ...baseRequest, value: 1n }, baseConfig).status,
+    ).toBe("reject");
+  });
+
+  it("flags null value as needs_manual_review", () => {
+    expect(
+      evaluateWalletRequest({ ...baseRequest, value: null }, baseConfig).status,
+    ).toBe("needs_manual_review");
+  });
+
+  it("rejects function selector not in whitelist", () => {
+    expect(
+      evaluateWalletRequest(
+        { ...baseRequest, actionFingerprint: "0xa9059cbb" },
+        baseConfig,
+      ).status,
+    ).toBe("reject");
+  });
+
+  it("accepts function selector case-insensitively", () => {
+    expect(
+      evaluateWalletRequest(
+        { ...baseRequest, actionFingerprint: "0xD0E30DB0" },
+        baseConfig,
+      ).status,
+    ).toBe("approve");
+  });
+});

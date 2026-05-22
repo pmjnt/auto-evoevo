@@ -33,6 +33,17 @@ export function evaluateWalletRequest(
     return { status: "reject", reason: `Contract is not whitelisted: ${request.contract}` };
   }
 
+  if (request.value === null) {
+    return { status: "needs_manual_review", reason: "Value could not be determined" };
+  }
+
+  if (request.value !== 0n) {
+    return {
+      status: "reject",
+      reason: `Unexpected native value: ${request.value.toString()}`,
+    };
+  }
+
   if (request.estimatedFeeNative === null) {
     return { status: "needs_manual_review", reason: "Estimated fee could not be determined" };
   }
@@ -57,6 +68,18 @@ export function evaluateWalletRequest(
 
   if (request.actionFingerprint === null) {
     return { status: "needs_manual_review", reason: "Action fingerprint is unavailable" };
+  }
+
+  const normalizedSelector = request.actionFingerprint.toLowerCase();
+  const allowedSelectors = new Set(
+    config.allowedFunctionSelectors.map((selector) => selector.toLowerCase()),
+  );
+
+  if (!allowedSelectors.has(normalizedSelector)) {
+    return {
+      status: "reject",
+      reason: `Function selector not whitelisted: ${request.actionFingerprint}`,
+    };
   }
 
   return { status: "approve", reason: "Wallet request matches EvoEvo memory guardrails" };
