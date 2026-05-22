@@ -13,6 +13,7 @@ function setMsg(text: string, color = "#9ece6a"): void {
 }
 
 document.getElementById("save")?.addEventListener("click", async () => {
+  const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;
   const config = {
     allowedOrigin: "https://evoevo.ai",
     allowedChain: "0G",
@@ -21,7 +22,7 @@ document.getElementById("save")?.addEventListener("click", async () => {
     allowedContracts: value("allowedContracts").split(",").map((s) => s.trim()).filter(Boolean),
     allowedFunctionSelectors: value("allowedFunctionSelectors").split(",").map((s) => s.trim()).filter(Boolean),
     maxFeeNative: Number(value("maxFeeNative")),
-    dryRun: true,
+    dryRun: dryRunEl?.checked ?? true,
     idleLockMinutes: Number(value("idleLockMinutes")) || 30,
   };
 
