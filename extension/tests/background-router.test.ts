@@ -47,4 +47,18 @@ describe("background router", () => {
     expect(response).toMatchObject({ ok: false });
     expect((response as any).error.code).toBe(4200);
   });
+
+  it("rejects rpc-request when automation is paused", async () => {
+    // Pause automation
+    await handleMessage({ type: "pause" }, {} as chrome.runtime.MessageSender);
+    const response = await handleMessage(
+      { type: "rpc-request", id: "1", method: "eth_sendTransaction", params: [{}] },
+      { tab: { url: "https://evoevo.ai/feed" } } as chrome.runtime.MessageSender,
+    );
+    expect(response).toMatchObject({ ok: false });
+    expect((response as any).error.code).toBe(4001);
+    expect((response as any).error.message).toBe("Automation paused");
+    // Resume for subsequent tests (reset state)
+    await handleMessage({ type: "resume" }, {} as chrome.runtime.MessageSender);
+  });
 });

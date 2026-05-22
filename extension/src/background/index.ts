@@ -69,6 +69,10 @@ export async function handleMessage(
     }
 
     case "rpc-request": {
+      if (paused) {
+        return { ok: false, error: { code: 4001, message: "Automation paused" } };
+      }
+
       const origin = senderOrigin(sender);
       if (origin === null) {
         return { ok: false, error: { code: 4001, message: "Origin missing" } };
