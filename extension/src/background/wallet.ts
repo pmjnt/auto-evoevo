@@ -17,8 +17,16 @@ export type TxToSign = {
 
 export type UnlockResult = { ok: true } | { ok: false; reason: string };
 
+export type WalletOptions = { idleLockMinutes?: number };
+
 export class Wallet {
   private signer: EthersWallet | null = null;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly idleMs: number;
+
+  constructor(options: WalletOptions = {}) {
+    this.idleMs = (options.idleLockMinutes ?? 30) * 60_000;
+  }
 
   get address(): string | null {
     return this.signer?.address ?? null;
@@ -30,6 +38,7 @@ export class Wallet {
     try {
       const privateKey = await decryptVault(vault, password);
       this.signer = new EthersWallet(privateKey);
+      this.armIdleTimer();
       return { ok: true };
     } catch {
       this.signer = null;
@@ -39,6 +48,15 @@ export class Wallet {
 
   lock(): void {
     this.signer = null;
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+  }
+
+  private armIdleTimer(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => this.lock(), this.idleMs);
   }
 
   async signTransaction(tx: TxToSign): Promise<string> {

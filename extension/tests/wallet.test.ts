@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
 import { encryptVault } from "../src/shared/crypto.js";
 import { setVault } from "../src/background/storage.js";
@@ -74,5 +74,23 @@ describe("wallet", () => {
         chainId: 16661,
       }),
     ).rejects.toThrow(/locked/i);
+  });
+});
+
+describe("wallet idle-lock", () => {
+  beforeEach(async () => {
+    installFakeChromeApi();
+    const vault = await encryptVault(TEST_KEY, "password-123");
+    await setVault(vault);
+  });
+
+  it("locks itself after the idle timeout elapses", async () => {
+    vi.useFakeTimers();
+    const wallet = new Wallet({ idleLockMinutes: 1 });
+    await wallet.unlock("password-123");
+    expect(wallet.address).not.toBeNull();
+    vi.advanceTimersByTime(60_000);
+    expect(wallet.address).toBeNull();
+    vi.useRealTimers();
   });
 });
