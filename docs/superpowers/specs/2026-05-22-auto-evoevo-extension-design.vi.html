@@ -297,7 +297,7 @@
   <span class="l-rpc">RPC bên ngoài / chain</span>
 </div>
 <div class="diagram-host">
-<svg viewBox="0 0 980 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ kiến trúc">
+<svg viewBox="0 0 1000 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sơ đồ kiến trúc">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#8a93a6"/>
@@ -305,84 +305,114 @@
     <style>
       .box { fill: #1c2230; stroke: #2a3142; stroke-width: 1; rx: 10; }
       .box.page { fill: #1c243a; stroke: #3a4a78; }
-      .box.bg { fill: #251e36; stroke: #4a3b6e; }
+      .box.bg { fill: #251e36; stroke: #4a3b6e; stroke-width: 1.4; }
       .box.ui { fill: #1a2a23; stroke: #345c4a; }
       .box.rpc { fill: #2a1c18; stroke: #6e4036; }
       .lbl { fill: #e6e9ef; font: 13px ui-sans-serif, sans-serif; }
       .lbl.sm { font-size: 11px; fill: #8a93a6; }
       .lbl.t { font-weight: 700; }
+      .lbl.alert { fill: #f7768e; font-weight: 700; }
       .edge { stroke: #8a93a6; stroke-width: 1.4; fill: none; }
       .edge.dash { stroke-dasharray: 4 4; }
-      .edge-lbl { fill: #8a93a6; font: 11px ui-monospace, monospace; }
+      .edge.strong { stroke: #7aa2f7; stroke-width: 1.8; }
+      .edge-lbl { fill: #c0c6d4; font: 11px ui-monospace, monospace; }
+      .edge-lbl.strong { fill: #7aa2f7; }
     </style>
   </defs>
 
-  <rect class="box page" x="20" y="20" width="540" height="220" />
-  <text class="lbl t" x="40" y="46">Tab evoevo.ai/feed</text>
+  <!-- ROW 1: Tab EvoEvo (top, full width) -->
+  <rect class="box page" x="40" y="20" width="920" height="200" />
+  <text class="lbl t" x="60" y="48">Tab evoevo.ai/feed</text>
 
-  <rect class="box" x="50" y="70" width="220" height="150" rx="8" />
-  <text class="lbl t" x="64" y="92">inpage/provider.ts</text>
-  <text class="lbl sm" x="64" y="110">main world</text>
-  <text class="lbl sm" x="64" y="134">• cung cấp window.ethereum</text>
-  <text class="lbl sm" x="64" y="150">• request() / events</text>
-  <text class="lbl sm" x="64" y="166">• thông báo EIP-6963</text>
-  <text class="lbl sm" x="64" y="190">cầu postMessage ↓</text>
+  <rect class="box" x="80" y="70" width="380" height="135" />
+  <text class="lbl t" x="98" y="94">inpage/provider.ts</text>
+  <text class="lbl sm" x="98" y="112">main world (thấy được bởi JS trang)</text>
+  <text class="lbl sm" x="98" y="138">• cung cấp window.ethereum</text>
+  <text class="lbl sm" x="98" y="156">• request() / events</text>
+  <text class="lbl sm" x="98" y="174">• thông báo EIP-6963</text>
+  <text class="lbl sm" x="98" y="192">• không có quyền chrome.*</text>
 
-  <rect class="box" x="310" y="70" width="230" height="150" rx="8" />
-  <text class="lbl t" x="324" y="92">content/*</text>
-  <text class="lbl sm" x="324" y="110">isolated world</text>
-  <text class="lbl sm" x="324" y="134">• inject inpage lúc document_start</text>
-  <text class="lbl sm" x="324" y="150">• cầu postMessage ↔ runtime</text>
-  <text class="lbl sm" x="324" y="166">• tự click ADD TO MEMORY</text>
-  <text class="lbl sm" x="324" y="182">• click SHOW MORE</text>
-  <text class="lbl sm" x="324" y="198">• máy trạng thái automation</text>
+  <rect class="box" x="540" y="70" width="380" height="135" />
+  <text class="lbl t" x="558" y="94">content/*</text>
+  <text class="lbl sm" x="558" y="112">isolated world (DOM + chrome.runtime)</text>
+  <text class="lbl sm" x="558" y="138">• inject inpage @ document_start</text>
+  <text class="lbl sm" x="558" y="156">• cầu postMessage ↔ runtime</text>
+  <text class="lbl sm" x="558" y="174">• tự click ADD TO MEMORY / SHOW MORE</text>
+  <text class="lbl sm" x="558" y="192">• máy trạng thái automation</text>
 
-  <line class="edge dash" x1="270" y1="145" x2="310" y2="145" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-  <text class="edge-lbl" x="245" y="138">postMessage</text>
+  <!-- inpage <-> content -->
+  <line class="edge dash" x1="460" y1="137" x2="540" y2="137" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl" x="467" y="130">postMessage</text>
 
-  <rect class="box bg" x="620" y="20" width="340" height="220" />
-  <text class="lbl t" x="640" y="46">background/ (service worker)</text>
-  <text class="lbl sm" x="640" y="70">• điều phối message</text>
-  <text class="lbl sm" x="640" y="86">• wallet (key trong RAM)</text>
-  <text class="lbl sm" x="640" y="102">• pipeline (guard + ký + broadcast)</text>
-  <text class="lbl sm" x="640" y="118">• client RPC 0G</text>
-  <text class="lbl sm" x="640" y="134">• session log + badge</text>
-  <text class="lbl sm" x="640" y="158">verify origin qua sender.tab.url</text>
-  <text class="lbl sm" x="640" y="174">tái sử dụng src/guard.ts</text>
-  <text class="lbl sm" x="640" y="190">key KHÔNG rời khỏi hộp này</text>
+  <!-- Tab -> Background -->
+  <line class="edge strong" x1="730" y1="220" x2="730" y2="270" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl strong" x="745" y="252">chrome.runtime.sendMessage</text>
 
-  <line class="edge" x1="540" y1="145" x2="620" y2="145" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-  <text class="edge-lbl" x="546" y="138">chrome.runtime.sendMessage</text>
+  <!-- ROW 2: Background (middle, full width) -->
+  <rect class="box bg" x="40" y="270" width="920" height="170" />
+  <text class="lbl t" x="60" y="298">background/ (service worker)</text>
+  <text class="lbl sm" x="60" y="318">Tâm xử lý — nơi duy nhất chứa private key sau khi unlock.</text>
 
-  <rect class="box ui" x="620" y="290" width="160" height="120" />
-  <text class="lbl t" x="640" y="316">popup.html</text>
-  <text class="lbl sm" x="640" y="336">unlock / trạng thái</text>
-  <text class="lbl sm" x="640" y="352">start · pause · resume</text>
-  <text class="lbl sm" x="640" y="368">xem log · export</text>
+  <text class="lbl sm" x="60"  y="350">• router message</text>
+  <text class="lbl sm" x="60"  y="368">• wallet (key trong RAM)</text>
+  <text class="lbl sm" x="60"  y="386">• pipeline (guard + ký + broadcast)</text>
 
-  <rect class="box ui" x="800" y="290" width="160" height="120" />
-  <text class="lbl t" x="820" y="316">options.html</text>
-  <text class="lbl sm" x="820" y="336">whitelist contract</text>
-  <text class="lbl sm" x="820" y="352">function selector</text>
-  <text class="lbl sm" x="820" y="368">RPC + fee cap</text>
-  <text class="lbl sm" x="820" y="384">wizard import key</text>
+  <text class="lbl sm" x="360" y="350">• client RPC 0G + retry</text>
+  <text class="lbl sm" x="360" y="368">• session log + badge counter</text>
+  <text class="lbl sm" x="360" y="386">• verify origin qua sender.tab.url</text>
 
-  <line class="edge" x1="700" y1="290" x2="780" y2="240" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-  <line class="edge" x1="880" y1="290" x2="850" y2="240" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-  <text class="edge-lbl" x="690" y="270">messages.ts (typed)</text>
+  <text class="lbl sm" x="660" y="350">• reuse src/guard.ts</text>
+  <text class="lbl sm" x="660" y="368">• inflight resume khi SW wake</text>
+  <text class="lbl alert" x="660" y="386">⚠ key KHÔNG rời hộp này</text>
 
-  <rect class="box rpc" x="620" y="450" width="340" height="60" />
-  <text class="lbl t" x="640" y="476">JSON-RPC endpoint của 0G</text>
-  <text class="lbl sm" x="640" y="494">eth_sendRawTransaction, gasPrice, getTransactionCount …</text>
-  <line class="edge" x1="780" y1="240" x2="780" y2="450" marker-end="url(#arrow)"/>
-  <text class="edge-lbl" x="788" y="350">fetch() (HTTPS)</text>
+  <!-- Background -> Storage -->
+  <line class="edge" x1="170" y1="440" x2="170" y2="510" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl" x="185" y="480">đọc/ghi</text>
 
-  <rect class="box" x="20" y="290" width="540" height="120" />
-  <text class="lbl t" x="40" y="316">chrome.storage</text>
-  <text class="lbl sm" x="40" y="336">local: vault mã hoá, config, session log (cap 1000 entries)</text>
-  <text class="lbl sm" x="40" y="352">session: state của tx đang in-flight (sống qua SW restart, chết khi đóng Chrome)</text>
-  <text class="lbl sm" x="40" y="376">vault không bao giờ rơi vào context inpage/content/page</text>
-  <line class="edge" x1="560" y1="350" x2="620" y2="170" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <!-- Background -> UI -->
+  <line class="edge" x1="500" y1="440" x2="500" y2="510" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <text class="edge-lbl" x="510" y="480">messages.ts</text>
+
+  <!-- Background -> 0G RPC (one-way) -->
+  <line class="edge strong" x1="830" y1="440" x2="830" y2="510" marker-end="url(#arrow)"/>
+  <text class="edge-lbl strong" x="845" y="480">fetch() HTTPS</text>
+
+  <!-- ROW 3a: chrome.storage (bottom-left) -->
+  <rect class="box" x="40" y="510" width="270" height="190" />
+  <text class="lbl t" x="58" y="535">chrome.storage</text>
+  <text class="lbl sm" x="58" y="558">local:</text>
+  <text class="lbl sm" x="74" y="576">• vault mã hoá AES-GCM</text>
+  <text class="lbl sm" x="74" y="594">• config (whitelist, fee cap)</text>
+  <text class="lbl sm" x="74" y="612">• session log (cap 1000)</text>
+  <text class="lbl sm" x="58" y="635">session:</text>
+  <text class="lbl sm" x="74" y="653">• inflight tx state</text>
+  <text class="lbl sm" x="74" y="671">  (sống qua SW restart,</text>
+  <text class="lbl sm" x="74" y="685">  mất khi đóng Chrome)</text>
+
+  <!-- ROW 3b: UI (bottom-middle) -->
+  <rect class="box ui" x="365" y="510" width="270" height="190" />
+  <text class="lbl t" x="383" y="535">UI extension</text>
+
+  <text class="lbl sm" x="383" y="558">popup.html</text>
+  <text class="lbl sm" x="399" y="576">• unlock / trạng thái</text>
+  <text class="lbl sm" x="399" y="594">• start · pause · resume</text>
+  <text class="lbl sm" x="399" y="612">• log preview · export</text>
+
+  <text class="lbl sm" x="383" y="635">options.html</text>
+  <text class="lbl sm" x="399" y="653">• whitelist + selector</text>
+  <text class="lbl sm" x="399" y="671">• RPC URL + chain id + cap</text>
+  <text class="lbl sm" x="399" y="685">• wizard import key</text>
+
+  <!-- ROW 3c: 0G RPC (bottom-right) -->
+  <rect class="box rpc" x="690" y="510" width="270" height="190" />
+  <text class="lbl t" x="708" y="535">JSON-RPC endpoint của 0G</text>
+  <text class="lbl sm" x="708" y="558">Chain EVM-compatible.</text>
+  <text class="lbl sm" x="708" y="582">• eth_sendRawTransaction</text>
+  <text class="lbl sm" x="708" y="600">• eth_getTransactionCount</text>
+  <text class="lbl sm" x="708" y="618">• eth_gasPrice / feeData</text>
+  <text class="lbl sm" x="708" y="636">• eth_getTransactionReceipt</text>
+  <text class="lbl sm" x="708" y="665">retry 3× với backoff</text>
+  <text class="lbl sm" x="708" y="683">500 / 1500 / 4500 ms</text>
 </svg>
 </div>
 
