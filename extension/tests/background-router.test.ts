@@ -98,7 +98,28 @@ describe("background router", () => {
     expect(status).toMatchObject({
       ok: true,
       paused: true,
+      automationStatus: "paused",
       lastError: "Timed out waiting for transaction after click",
+    });
+  });
+
+  it("reports done separately from a manual pause", async () => {
+    await handleMessage({ type: "resume" }, {} as chrome.runtime.MessageSender);
+
+    await handleMessage(
+      { type: "automation-event", event: { type: "done" } },
+      {} as chrome.runtime.MessageSender,
+    );
+
+    const status = await handleMessage(
+      { type: "get-status" },
+      {} as chrome.runtime.MessageSender,
+    );
+    expect(status).toMatchObject({
+      ok: true,
+      paused: true,
+      automationStatus: "done",
+      lastError: null,
     });
   });
 
@@ -113,6 +134,16 @@ describe("background router", () => {
     expect(response).toMatchObject({ ok: true });
     expect(chromeApi.tabs._reloads()).toEqual([7]);
 
+    const reloadingStatus = await handleMessage(
+      { type: "get-status" },
+      {} as chrome.runtime.MessageSender,
+    );
+    expect(reloadingStatus).toMatchObject({
+      ok: true,
+      paused: false,
+      automationStatus: "reloading",
+    });
+
     chromeApi.tabs._complete(7);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -123,6 +154,16 @@ describe("background router", () => {
         cooldownMs: 0,
         stopAtRemaining: 0,
       },
+    });
+
+    const resumedStatus = await handleMessage(
+      { type: "get-status" },
+      {} as chrome.runtime.MessageSender,
+    );
+    expect(resumedStatus).toMatchObject({
+      ok: true,
+      paused: false,
+      automationStatus: "running",
     });
   });
 

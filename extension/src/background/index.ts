@@ -8,7 +8,9 @@ import { runPipeline } from "./pipeline.js";
 const wallet = new Wallet();
 const log = new SessionLog();
 const PENDING_AUTOMATION_RESUME_TAB_ID = "pendingAutomationResumeTabId";
+type AutomationStatus = "idle" | "running" | "reloading" | "paused" | "done" | "error";
 let paused = false;
+let automationStatus: AutomationStatus = "idle";
 let reloadResumeTabId: number | null = null;
 let lastError: string | null = null;
 let tabLifecycleListenerInstalled = false;
@@ -80,6 +82,7 @@ export async function handleMessage(
         locked: wallet.address === null,
         address: wallet.address,
         paused,
+        automationStatus: await currentAutomationStatus(),
         counts: await log.counts(),
         lastError,
       };
@@ -90,11 +93,13 @@ export async function handleMessage(
 
     case "pause":
       paused = true;
+      automationStatus = "paused";
       lastError = null;
       return { ok: true };
 
     case "resume": {
       paused = false;
+      automationStatus = "running";
       lastError = null;
       const settings = await currentAutomationSettings();
       const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
@@ -103,6 +108,7 @@ export async function handleMessage(
 
     case "start": {
       paused = false;
+      automationStatus = "running";
       lastError = null;
       const settings = await currentAutomationSettings();
       const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
@@ -111,20 +117,24 @@ export async function handleMessage(
 
     case "stop":
       paused = true;
+      automationStatus = "paused";
       lastError = null;
       return { ok: true };
 
     case "automation-event":
       if (message.event.type === "started") {
         paused = false;
+        automationStatus = "running";
         lastError = null;
       }
       if (message.event.type === "paused") {
         paused = true;
+        automationStatus = "paused";
         lastError = message.event.reason ?? "Automation paused";
       }
       if (message.event.type === "done") {
         paused = true;
+        automationStatus = "done";
         lastError = null;
       }
       if (message.event.type === "reload_requested") return await reloadSenderTab(sender);
@@ -322,18 +332,21 @@ async function reloadSenderTab(
   const tabId = sender.tab?.id;
   if (tabId === undefined) {
     paused = true;
+    automationStatus = "error";
     lastError = "Cannot reload EvoEvo tab: sender tab missing.";
     return { ok: false, error: { code: 4001, message: lastError } };
   }
 
   if (typeof chrome === "undefined" || !chrome.tabs?.reload) {
     paused = true;
+    automationStatus = "error";
     lastError = "Cannot reload EvoEvo tab: chrome.tabs.reload unavailable.";
     return { ok: false, error: { code: 4001, message: lastError } };
   }
 
   reloadResumeTabId = tabId;
   paused = false;
+  automationStatus = "reloading";
   lastError = "Reloading EvoEvo after submitted transaction...";
   await setPendingAutomationResumeTabId(tabId);
   try {
@@ -342,6 +355,7 @@ async function reloadSenderTab(
     reloadResumeTabId = null;
     await clearPendingAutomationResumeTabId();
     paused = true;
+    automationStatus = "error";
     lastError = error instanceof Error ? error.message : String(error);
     return { ok: false, error: { code: 4001, message: lastError } };
   }
@@ -379,6 +393,7 @@ async function handleTabUpdated(
 
 async function resumeAutomationInTab(tabId: number): Promise<void> {
   paused = false;
+  automationStatus = "running";
   lastError = null;
   const settings = await currentAutomationSettings();
   let notified = 0;
@@ -389,9 +404,15 @@ async function resumeAutomationInTab(tabId: number): Promise<void> {
   }
   if (notified === 0) {
     paused = true;
+    automationStatus = "error";
     lastError =
       "Reloaded EvoEvo tab but the content script did not respond. Press Start again.";
   }
+}
+
+async function currentAutomationStatus(): Promise<AutomationStatus> {
+  if ((await getPendingAutomationResumeTabId()) !== null) return "reloading";
+  return automationStatus;
 }
 
 async function setPendingAutomationResumeTabId(tabId: number): Promise<void> {

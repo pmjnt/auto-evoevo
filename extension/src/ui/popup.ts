@@ -5,6 +5,7 @@ type Status = {
   locked: boolean;
   address: string | null;
   paused: boolean;
+  automationStatus?: "idle" | "running" | "reloading" | "paused" | "done" | "error";
   counts: Record<string, number>;
   lastError?: string | null;
 };
@@ -38,11 +39,16 @@ async function refresh(): Promise<void> {
   setText("rejected", String(status.counts["rejected"] ?? 0));
   setText("runtime-error", status.lastError ?? "");
 
-  const statusText = status.paused ? "paused" : "running";
+  const statusText = status.automationStatus ?? (status.paused ? "paused" : "running");
   setText("status-text", statusText);
   const statusEl = document.getElementById("status-text");
   if (statusEl) {
-    statusEl.style.color = status.paused ? "#ffd166" : "#65d18f";
+    statusEl.style.color =
+      statusText === "running"
+        ? "#65d18f"
+        : statusText === "error"
+          ? "#ff6b6b"
+          : "#ffd166";
   }
 
   const pauseBtn = document.getElementById("pause") as HTMLButtonElement | null;
