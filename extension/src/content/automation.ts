@@ -149,7 +149,7 @@ async function waitForFeedControls(timeoutMs: number): Promise<boolean> {
 
 function hasFeedControls(): boolean {
   return controlElements().some((control) =>
-    /add to memory|show more/i.test(controlText(control)),
+    isMemoryControl(control) || isShowMoreControl(control),
   );
 }
 
@@ -184,7 +184,7 @@ function isVisibleElement(element: Element): boolean {
 
 function nextMemoryButton(): HTMLElement | null {
   for (const control of controlElements()) {
-    if (!/add to memory/i.test(controlText(control))) continue;
+    if (!isMemoryControl(control)) continue;
     if (control.hasAttribute(MARKER)) continue;
     if (!isVisibleEnabled(control)) continue;
     return control;
@@ -194,7 +194,7 @@ function nextMemoryButton(): HTMLElement | null {
 
 async function tryShowMore(): Promise<boolean> {
   const showMore = controlElements().find((control) =>
-    /show more/i.test(controlText(control)),
+    isShowMoreControl(control),
   );
   if (!showMore || !isVisibleEnabled(showMore)) return false;
   const before = countMemoryControls();
@@ -205,7 +205,7 @@ async function tryShowMore(): Promise<boolean> {
 
 function countMemoryControls(): number {
   return controlElements().filter((control) =>
-    /add to memory/i.test(controlText(control)),
+    isMemoryControl(control),
   ).length;
 }
 
@@ -219,13 +219,13 @@ function isVisibleEnabled(el: HTMLElement): boolean {
 function shouldStopForBuffer(threshold: number): boolean {
   const unmarked = controlElements().filter(
     (control) =>
-      /add to memory/i.test(controlText(control)) &&
+      isMemoryControl(control) &&
       !control.hasAttribute(MARKER) &&
       isVisibleEnabled(control),
   ).length;
   const canExpand = controlElements().some(
     (control) =>
-      /show more/i.test(controlText(control)) && isVisibleEnabled(control),
+      isShowMoreControl(control) && isVisibleEnabled(control),
   );
   return unmarked <= threshold && !canExpand;
 }
@@ -244,4 +244,12 @@ function controlElements(): HTMLElement[] {
 
 function controlText(element: HTMLElement): string {
   return (element.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+function isMemoryControl(element: HTMLElement): boolean {
+  return controlText(element).toLowerCase() === "add to memory";
+}
+
+function isShowMoreControl(element: HTMLElement): boolean {
+  return controlText(element).toLowerCase() === "show more";
 }

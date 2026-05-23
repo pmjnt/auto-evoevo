@@ -216,6 +216,30 @@ describe("automation loop", () => {
     expect(control.hasAttribute("data-auto-evoevo-attempted-id")).toBe(true);
   });
 
+  it("only matches exact add-to-memory and show-more labels", async () => {
+    const wrongMemory = document.createElement("button");
+    wrongMemory.textContent = "ADD TO MEMORY 122";
+    const wrongShowMore = document.createElement("button");
+    wrongShowMore.textContent = "SHOW MORE RESULTS";
+    const memory = document.createElement("button");
+    memory.textContent = "ADD TO MEMORY";
+    const showMore = document.createElement("button");
+    showMore.textContent = "SHOW MORE";
+    document.body.append(wrongMemory, wrongShowMore, memory, showMore);
+
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+
+    await runAutomation({
+      nextOutcome,
+      stopAtRemaining: 1,
+      onEvent: () => undefined,
+    });
+
+    expect(nextOutcome).toHaveBeenCalledTimes(1);
+    expect(wrongMemory.hasAttribute("data-auto-evoevo-attempted-id")).toBe(false);
+    expect(memory.hasAttribute("data-auto-evoevo-attempted-id")).toBe(true);
+  });
+
   it("does not wait on a hidden retained submitting modal", async () => {
     vi.useFakeTimers();
     buildFeedDom(2);
