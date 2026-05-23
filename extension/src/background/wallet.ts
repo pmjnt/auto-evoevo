@@ -1,0 +1,79 @@
+import { Wallet as EthersWallet } from "ethers";
+
+import { decryptVault } from "../shared/crypto.js";
+import { getVault } from "./storage.js";
+
+export type TxToSign = {
+  to: string;
+  data: string;
+  value: bigint;
+  nonce: number;
+  gasLimit: bigint;
+  gasPrice?: bigint;
+  maxFeePerGas?: bigint;
+  maxPriorityFeePerGas?: bigint;
+  chainId: number;
+};
+
+export type UnlockResult = { ok: true } | { ok: false; reason: string };
+
+export type WalletOptions = { idleLockMinutes?: number };
+
+export class Wallet {
+  private signer: EthersWallet | null = null;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly idleMs: number;
+
+  constructor(options: WalletOptions = {}) {
+    this.idleMs = (options.idleLockMinutes ?? 30) * 60_000;
+  }
+
+  get address(): string | null {
+    return this.signer?.address ?? null;
+  }
+
+  async unlock(password: string): Promise<UnlockResult> {
+    const vault = await getVault();
+    if (vault === null) return { ok: false, reason: "No vault stored" };
+    try {
+      const privateKey = await decryptVault(vault, password);
+      this.signer = new EthersWallet(privateKey);
+      this.armIdleTimer();
+      return { ok: true };
+    } catch {
+      this.signer = null;
+      return { ok: false, reason: "Wrong password" };
+    }
+  }
+
+  lock(): void {
+    this.signer = null;
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+  }
+
+  private armIdleTimer(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => this.lock(), this.idleMs);
+  }
+
+  async signTransaction(tx: TxToSign): Promise<string> {
+    if (this.signer === null) {
+      throw new Error("Wallet is locked");
+    }
+    this.armIdleTimer();
+    return await this.signer.signTransaction({
+      to: tx.to,
+      data: tx.data,
+      value: tx.value,
+      nonce: tx.nonce,
+      gasLimit: tx.gasLimit,
+      gasPrice: tx.gasPrice,
+      maxFeePerGas: tx.maxFeePerGas,
+      maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
+      chainId: tx.chainId,
+    });
+  }
+}

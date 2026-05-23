@@ -4,3 +4,5 @@ logs/
 config.local.json
 playwright-report/
 test-results/
+extension/node_modules/
+extension/dist/
