@@ -61,14 +61,39 @@ export function installProvider(): EIP1193Provider {
 
   (window as unknown as { ethereum?: EIP1193Provider }).ethereum = provider;
 
-  window.dispatchEvent(
-    new CustomEvent("eip6963:announceProvider", {
-      detail: Object.freeze({
-        info: { uuid: crypto.randomUUID(), name: "Auto EvoEvo", rdns: "ai.evoevo.auto" },
-        provider,
-      }),
-    }),
-  );
+  // EIP-6963 wallet discovery. We announce once on install and also respond
+  // to requestProvider so dApps that mount AFTER us (e.g. Reown / Web3Modal)
+  // still discover the wallet. A stable uuid lets pickers dedupe across
+  // multiple announces.
+  const announceDetail = Object.freeze({
+    info: {
+      uuid: "auto-evoevo-0001-0000-0000-000000000001",
+      name: "Auto EvoEvo",
+      rdns: "ai.evoevo.auto",
+      icon: PROVIDER_ICON_DATA_URL,
+    },
+    provider,
+  });
+
+  const announce = (): void => {
+    window.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", { detail: announceDetail }),
+    );
+  };
+
+  window.addEventListener("eip6963:requestProvider", announce);
+  announce();
 
   return provider;
 }
+
+// 24x24 purple square SVG, base64-encoded. Reown's modal requires a non-empty
+// icon URL or the wallet entry is dropped silently.
+const PROVIDER_ICON_DATA_URL =
+  "data:image/svg+xml;base64," +
+  btoa(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
+      '<rect width="24" height="24" rx="6" fill="#7aa2f7"/>' +
+      '<text x="12" y="16" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="#0b0e14">AE</text>' +
+      "</svg>",
+  );

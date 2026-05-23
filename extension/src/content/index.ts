@@ -52,13 +52,32 @@ window.addEventListener("message", (event: MessageEvent) => {
   });
 });
 
+let automationRunning = false;
+
 chrome.runtime.onMessage.addListener((message: unknown) => {
-  const value = message as { type?: string };
+  const value = message as { type?: string; event?: string; value?: unknown };
   if (value?.type === "start-automation") {
+    if (automationRunning) return;
+    automationRunning = true;
     void runAutomation({
       nextOutcome,
       onEvent: (event) => chrome.runtime.sendMessage({ type: "automation-event", event }),
+    }).finally(() => {
+      automationRunning = false;
     });
+    return;
+  }
+  if (value?.type === "wallet-event") {
+    window.postMessage(
+      {
+        source: SOURCE_EXT,
+        target: "page",
+        type: "event",
+        event: value.event,
+        value: value.value,
+      },
+      "*",
+    );
   }
 });
 
