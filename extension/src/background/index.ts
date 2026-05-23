@@ -55,11 +55,15 @@ export async function handleMessage(
       if (!result.ok) {
         return { ok: false, error: { code: 4100, message: result.reason } };
       }
+      await broadcastWalletEventToEvoEvoTabs("accountsChanged", [
+        wallet.address as string,
+      ]);
       return { ok: true, address: wallet.address };
     }
 
     case "lock": {
       wallet.lock();
+      await broadcastWalletEventToEvoEvoTabs("accountsChanged", []);
       return { ok: true };
     }
 
@@ -77,9 +81,11 @@ export async function handleMessage(
       paused = true;
       return { ok: true };
 
-    case "resume":
+    case "resume": {
       paused = false;
-      return { ok: true };
+      const tabsNotified = await broadcastStartToEvoEvoTabs();
+      return { ok: true, tabsNotified };
+    }
 
     case "start": {
       paused = false;
@@ -216,13 +222,24 @@ function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
 }
 
 async function broadcastStartToEvoEvoTabs(): Promise<number> {
+  return await broadcastToEvoEvoTabs({ type: "start-automation" });
+}
+
+async function broadcastWalletEventToEvoEvoTabs(
+  event: string,
+  value: unknown,
+): Promise<void> {
+  await broadcastToEvoEvoTabs({ type: "wallet-event", event, value });
+}
+
+async function broadcastToEvoEvoTabs(message: unknown): Promise<number> {
   if (typeof chrome === "undefined" || !chrome.tabs?.query) return 0;
   const tabs = await chrome.tabs.query({ url: "https://evoevo.ai/*" });
   let notified = 0;
   for (const tab of tabs) {
     if (tab.id === undefined) continue;
     try {
-      await chrome.tabs.sendMessage(tab.id, { type: "start-automation" });
+      await chrome.tabs.sendMessage(tab.id, message);
       notified += 1;
     } catch {
       // tab without content script attached — ignore
