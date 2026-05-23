@@ -86,7 +86,12 @@ describe("automation loop", () => {
 
     firstButton.addEventListener("click", () => {
       clicked.push("first");
-      modal.textContent = "Submitting On-Chain Loading your agents...";
+      modal.setAttribute("role", "status");
+      modal.innerHTML = `
+        <p>Submitting On-Chain</p>
+        <p>Loading your agents…</p>
+        <p>Please keep this page open until the transaction flow completes.</p>
+      `;
       document.body.append(modal);
     });
     secondButton.addEventListener("click", () => {
@@ -122,7 +127,12 @@ describe("automation loop", () => {
 
     firstButton.addEventListener("click", () => {
       clicked.push("first");
-      coveredModal.textContent = "Submitting On-Chain Loading your agents...";
+      coveredModal.setAttribute("role", "status");
+      coveredModal.innerHTML = `
+        <p>Submitting On-Chain</p>
+        <p>Loading your agents…</p>
+        <p>Please keep this page open until the transaction flow completes.</p>
+      `;
       cover.textContent = "Feed overlay";
       coveredModal.getBoundingClientRect = () =>
         ({ left: 100, top: 100, right: 400, bottom: 300, width: 300, height: 200 } as DOMRect);
@@ -143,6 +153,33 @@ describe("automation loop", () => {
 
     await vi.advanceTimersByTimeAsync(1_000);
     await runPromise;
+
+    expect(clicked).toEqual(["first", "second"]);
+    expect(events).not.toContain("reload_requested");
+  });
+
+  it("ignores submitting text that is not inside the status popup", async () => {
+    buildFeedDom(2);
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const firstButton = buttons[0] as HTMLButtonElement;
+    const secondButton = buttons[1] as HTMLButtonElement;
+    const staleText = document.createElement("div");
+    const clicked: string[] = [];
+    const events: string[] = [];
+
+    firstButton.addEventListener("click", () => {
+      clicked.push("first");
+      staleText.textContent = "Submitting On-Chain Loading your agents...";
+      document.body.append(staleText);
+    });
+    secondButton.addEventListener("click", () => {
+      clicked.push("second");
+    });
+
+    await runAutomation({
+      nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
+      onEvent: (event) => events.push(event.type),
+    });
 
     expect(clicked).toEqual(["first", "second"]);
     expect(events).not.toContain("reload_requested");

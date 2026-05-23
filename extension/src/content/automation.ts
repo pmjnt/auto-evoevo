@@ -158,13 +158,30 @@ function hasFeedControls(): boolean {
 }
 
 function hasSubmittingModal(): boolean {
-  const elements = Array.from(document.body.querySelectorAll("*"));
-  return elements.some((element) => {
-    if (element === document.body || element === document.documentElement) return false;
-    const text = element.textContent ?? "";
-    if (!/submitting on-chain|loading your agents/i.test(text)) return false;
+  const statusCards = Array.from(document.body.querySelectorAll("[role='status']"));
+  return statusCards.some((element) => {
+    if (!(element instanceof HTMLElement)) return false;
+    if (!isSubmittingStatusCard(element)) return false;
     return isVisibleElement(element) && isTopViewportElement(element);
   });
+}
+
+function isSubmittingStatusCard(element: HTMLElement): boolean {
+  const labels = Array.from(element.querySelectorAll("p,span")).map((item) =>
+    normalizeStatusText(item.textContent ?? ""),
+  );
+  return (
+    labels.includes("submitting on-chain") &&
+    labels.includes("loading your agents...")
+  );
+}
+
+function normalizeStatusText(text: string): string {
+  return text
+    .replace(/\u2026/g, "...")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function isTopViewportElement(element: Element): boolean {
