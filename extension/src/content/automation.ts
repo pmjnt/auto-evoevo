@@ -56,6 +56,10 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
   let index = 0;
 
   while (idleExpansions < IDLE_LIMIT) {
+    if (!hasFeedControls() && !(await waitForFeedControls(emptyFeedTimeoutMs))) {
+      break;
+    }
+
     if (stopAtRemaining > 0 && shouldStopForBuffer(stopAtRemaining)) {
       break;
     }
@@ -156,9 +160,37 @@ function hasFeedControls(): boolean {
 function hasSubmittingModal(): boolean {
   const elements = Array.from(document.body.querySelectorAll("*"));
   return elements.some((element) => {
+    if (element === document.body || element === document.documentElement) return false;
     const text = element.textContent ?? "";
     if (!/submitting on-chain|loading your agents/i.test(text)) return false;
-    return isVisibleElement(element);
+    return isVisibleElement(element) && isTopViewportElement(element);
+  });
+}
+
+function isTopViewportElement(element: Element): boolean {
+  if (!(element instanceof HTMLElement)) return false;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return true;
+
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const left = Math.max(0, rect.left);
+  const top = Math.max(0, rect.top);
+  const right = Math.min(viewportWidth, rect.right);
+  const bottom = Math.min(viewportHeight, rect.bottom);
+  if (right <= left || bottom <= top) return false;
+  if (typeof document.elementFromPoint !== "function") return true;
+
+  const points: Array<[number, number]> = [
+    [(left + right) / 2, (top + bottom) / 2],
+    [left + 1, top + 1],
+    [right - 1, top + 1],
+    [left + 1, bottom - 1],
+    [right - 1, bottom - 1],
+  ];
+  return points.some(([x, y]) => {
+    const topElement = document.elementFromPoint(x, y);
+    return topElement !== null && element.contains(topElement);
   });
 }
 

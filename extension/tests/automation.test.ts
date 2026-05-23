@@ -109,6 +109,45 @@ describe("automation loop", () => {
     expect(events).toEqual(["started", "clicked", "approved", "reload_requested"]);
   });
 
+  it("ignores submitting text when it is covered by another element", async () => {
+    vi.useFakeTimers();
+    buildFeedDom(2);
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const firstButton = buttons[0] as HTMLButtonElement;
+    const secondButton = buttons[1] as HTMLButtonElement;
+    const coveredModal = document.createElement("div");
+    const cover = document.createElement("div");
+    const clicked: string[] = [];
+    const events: string[] = [];
+
+    firstButton.addEventListener("click", () => {
+      clicked.push("first");
+      coveredModal.textContent = "Submitting On-Chain Loading your agents...";
+      cover.textContent = "Feed overlay";
+      coveredModal.getBoundingClientRect = () =>
+        ({ left: 100, top: 100, right: 400, bottom: 300, width: 300, height: 200 } as DOMRect);
+      cover.getBoundingClientRect = () =>
+        ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 } as DOMRect);
+      document.body.append(coveredModal, cover);
+      vi.spyOn(document, "elementFromPoint").mockReturnValue(cover);
+    });
+    secondButton.addEventListener("click", () => {
+      clicked.push("second");
+    });
+
+    const runPromise = runAutomation({
+      nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
+      modalRefreshDelayMs: 1_000,
+      onEvent: (event) => events.push(event.type),
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await runPromise;
+
+    expect(clicked).toEqual(["first", "second"]);
+    expect(events).not.toContain("reload_requested");
+  });
+
   it("waits for feed controls to appear after a reload before declaring done", async () => {
     vi.useFakeTimers();
     const events: string[] = [];
@@ -122,6 +161,30 @@ describe("automation loop", () => {
 
     await vi.advanceTimersByTimeAsync(500);
     buildFeedDom(1);
+    await vi.runOnlyPendingTimersAsync();
+    await runPromise;
+
+    expect(nextOutcome).toHaveBeenCalledTimes(1);
+    expect(events).toContain("clicked");
+    expect(events.at(-1)).toBe("done");
+  });
+
+  it("waits for feed controls before applying the remaining-item buffer", async () => {
+    vi.useFakeTimers();
+    const events: string[] = [];
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+
+    const runPromise = runAutomation({
+      nextOutcome,
+      stopAtRemaining: 10,
+      emptyFeedTimeoutMs: 1_000,
+      onEvent: (event) => events.push(event.type),
+    });
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(events).toEqual(["started"]);
+
+    buildFeedDom(11);
     await vi.runOnlyPendingTimersAsync();
     await runPromise;
 
