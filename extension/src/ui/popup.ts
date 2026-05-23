@@ -1,5 +1,20 @@
 import { send } from "./shared.js";
 
+type ExtensionConfig = {
+  allowedOrigin: string;
+  allowedChain: string;
+  chainId: number;
+  rpcUrl: string;
+  allowedContracts: string[];
+  allowedFunctionSelectors: string[];
+  maxFeeNative: number;
+  dryRun: boolean;
+  idleLockMinutes: number;
+  cooldownSeconds: number;
+  overrideWalletProvider: boolean;
+  stopAtRemaining: number;
+};
+
 type Status = {
   ok: boolean;
   locked: boolean;
@@ -8,6 +23,21 @@ type Status = {
   automationStatus?: "idle" | "running" | "reloading" | "paused" | "done" | "error";
   counts: Record<string, number>;
   lastError?: string | null;
+};
+
+const DEFAULT_CONFIG: ExtensionConfig = {
+  allowedOrigin: "https://evoevo.ai",
+  allowedChain: "0G",
+  chainId: 16661,
+  rpcUrl: "https://evmrpc.0g.ai",
+  allowedContracts: ["0x61bb710000000000000000000000000000e937f9"],
+  allowedFunctionSelectors: ["0xd0e30db0"],
+  maxFeeNative: 0.001,
+  dryRun: true,
+  idleLockMinutes: 30,
+  cooldownSeconds: 3,
+  overrideWalletProvider: true,
+  stopAtRemaining: 10,
 };
 
 function show(id: "locked" | "unlocked"): void {
@@ -21,6 +51,7 @@ function setText(id: string, value: string): void {
 }
 
 let lastStatus: Status | null = null;
+let lastConfig: ExtensionConfig = DEFAULT_CONFIG;
 
 async function refresh(): Promise<void> {
   const status = (await send({ type: "get-status" })) as Status;
@@ -53,6 +84,8 @@ async function refresh(): Promise<void> {
 
   const pauseBtn = document.getElementById("pause") as HTMLButtonElement | null;
   if (pauseBtn) pauseBtn.textContent = status.paused ? "Resume" : "Pause";
+
+  await refreshConfig();
 }
 
 document.getElementById("unlock")?.addEventListener("click", async () => {
@@ -83,6 +116,20 @@ document.getElementById("start")?.addEventListener("click", async () => {
   await startAutomation();
 });
 
+document.getElementById("override-wallet")?.addEventListener("change", async (event) => {
+  const checked = (event.currentTarget as HTMLInputElement).checked;
+  const nextConfig = { ...lastConfig, overrideWalletProvider: checked };
+  const response = await send({ type: "set-config", config: nextConfig });
+  if (!response.ok) {
+    (event.currentTarget as HTMLInputElement).checked =
+      lastConfig.overrideWalletProvider;
+    setText("runtime-error", "Failed to save wallet override setting.");
+    return;
+  }
+  lastConfig = nextConfig;
+  setText("runtime-error", "");
+});
+
 async function startAutomation(): Promise<void> {
   setText("start-msg", "Starting...");
   const response = (await send({ type: "start" })) as {
@@ -102,6 +149,17 @@ async function startAutomation(): Promise<void> {
       : "No evoevo.ai tab open - open https://evoevo.ai/feed first.",
   );
   await refresh();
+}
+
+async function refreshConfig(): Promise<void> {
+  const response = (await send({ type: "get-config" })) as {
+    ok: boolean;
+    config?: Partial<ExtensionConfig> | null;
+  };
+  if (!response.ok) return;
+  lastConfig = { ...DEFAULT_CONFIG, ...(response.config ?? {}) };
+  const toggle = document.getElementById("override-wallet") as HTMLInputElement | null;
+  if (toggle) toggle.checked = lastConfig.overrideWalletProvider;
 }
 
 void refresh();

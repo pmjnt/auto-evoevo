@@ -13,7 +13,6 @@ function setupOptionsDom(): void {
     <input id="allowedContracts" value="0x61bb710000000000000000000000000000e937f9" />
     <input id="allowedFunctionSelectors" value="0xd0e30db0" />
     <input id="dryRun" type="checkbox" checked />
-    <input id="overrideWalletProvider" type="checkbox" checked />
     <input id="privateKey" value="" />
     <input id="password" value="" />
     <button id="save">Save configuration</button>
@@ -27,7 +26,11 @@ function installRuntimeStub(): Message[] {
     runtime: {
       sendMessage: (message: Message, callback: (response: unknown) => void) => {
         messages.push(message);
-        callback(message.type === "get-config" ? { ok: true, config: null } : { ok: true });
+        callback(
+          message.type === "get-config"
+            ? { ok: true, config: { overrideWalletProvider: false } }
+            : { ok: true },
+        );
       },
     },
   };
@@ -55,7 +58,7 @@ describe("options page", () => {
     expect(saveMessage?.config).toMatchObject({
       cooldownSeconds: 7,
       idleLockMinutes: 30,
-      overrideWalletProvider: true,
+      overrideWalletProvider: false,
     });
     expect(document.getElementById("msg")?.textContent).toBe("Saved");
   });
