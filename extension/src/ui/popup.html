@@ -4,48 +4,193 @@
   <meta charset="utf-8" />
   <title>Auto EvoEvo</title>
   <style>
-    body { width: 340px; font-family: system-ui, sans-serif; margin: 0; padding: 14px; background: #0f1115; color: #e6e9ef; }
-    h1 { font-size: 14px; margin: 0 0 12px; }
-    label { display: block; font-size: 12px; color: #8a93a6; margin-bottom: 4px; }
+    * { box-sizing: border-box; }
+    :root {
+      color-scheme: dark;
+      --bg: #080b10;
+      --field: #090e16;
+      --border: #263245;
+      --border-strong: #3a4a64;
+      --text: #eef5ff;
+      --muted: #9aa9c0;
+      --soft: #c4d4ee;
+      --blue: #77a7ff;
+      --cyan: #32d4e8;
+      --danger: #ff6b8a;
+    }
+    body {
+      width: 360px;
+      margin: 0;
+      padding: 14px;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(50, 212, 232, .10), transparent 36%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .popup {
+      overflow: hidden;
+      border: 1px solid rgba(96, 121, 158, .32);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(20, 28, 42, .96), rgba(12, 17, 25, .98));
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .30);
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      border-bottom: 1px solid rgba(96, 121, 158, .20);
+    }
+    .logo {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #35e4ef, #76a7ff 58%, #b78cff);
+      color: #031016;
+      font-size: 16px;
+      font-weight: 900;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .36), 0 8px 18px rgba(50, 212, 232, .18);
+    }
+    h1 { margin: 0; font-size: 15px; line-height: 1.1; letter-spacing: 0; }
+    .subtitle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .pill {
+      margin-left: auto;
+      padding: 4px 8px;
+      border: 1px solid rgba(50, 212, 232, .38);
+      border-radius: 999px;
+      color: var(--cyan);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .body { padding: 14px; }
+    label { display: block; margin-bottom: 6px; color: var(--soft); font-size: 12px; }
     input, button { font: inherit; }
-    .input { width: 100%; padding: 8px 10px; background: #0e1219; border: 1px solid #2a3142; color: #e6e9ef; border-radius: 6px; }
-    .btn { padding: 8px 12px; border-radius: 6px; background: #7aa2f7; color: #0b0e14; font-weight: 600; border: none; cursor: pointer; }
-    .btn.ghost { background: transparent; color: #e6e9ef; border: 1px solid #2a3142; }
-    .row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 13px; }
-    .kv .k { color: #8a93a6; }
+    .input {
+      width: 100%;
+      min-width: 0;
+      height: 38px;
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      outline: none;
+      background: var(--field);
+      color: var(--text);
+    }
+    .input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(119, 167, 255, .14);
+    }
+    .btn {
+      min-height: 36px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--blue), #91b9ff);
+      color: #06101d;
+      cursor: pointer;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 8px 18px rgba(119, 167, 255, .2);
+    }
+    .btn.ghost {
+      border: 1px solid var(--border-strong);
+      background: transparent;
+      color: var(--soft);
+      box-shadow: none;
+    }
+    .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .address {
+      grid-column: 1 / -1;
+      overflow: hidden;
+      color: var(--soft);
+      font: 700 12px/1.25 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stat {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid rgba(96, 121, 158, .24);
+      border-radius: 7px;
+      background: rgba(8, 13, 21, .72);
+    }
+    .stat span {
+      display: block;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stat strong {
+      display: block;
+      margin-top: 2px;
+      font-size: 18px;
+      line-height: 1.1;
+    }
+    #start-msg, #unlock-error {
+      min-height: 16px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    #unlock-error { color: var(--danger); }
     section { display: none; }
     section.active { display: block; }
   </style>
 </head>
 <body>
-  <h1>Auto EvoEvo</h1>
-  <section id="locked" class="active">
-    <label for="password">Master password</label>
-    <input id="password" class="input" type="password" autocomplete="current-password" />
-    <div class="row">
-      <span></span>
-      <button id="unlock" class="btn">Unlock</button>
-    </div>
-    <div id="unlock-error" style="color: #f7768e; font-size: 12px; margin-top: 8px;"></div>
-  </section>
+  <main class="popup">
+    <header class="head">
+      <div class="logo">E</div>
+      <div>
+        <h1>Auto EvoEvo</h1>
+        <p class="subtitle">Guarded 0G signer</p>
+      </div>
+      <div class="pill">0G</div>
+    </header>
 
-  <section id="unlocked">
-    <div class="kv">
-      <div class="k">Address</div><div id="address"></div>
-      <div class="k">Status</div><div id="status-text" style="font-weight: 600;">idle</div>
-      <div class="k">Signed</div><div id="signed">0</div>
-      <div class="k">Dry-run</div><div id="dry">0</div>
-      <div class="k">Manual</div><div id="manual">0</div>
-      <div class="k">Rejected</div><div id="rejected">0</div>
+    <div class="body">
+      <section id="locked" class="active">
+        <label for="password">Master password</label>
+        <input id="password" class="input" type="password" autocomplete="current-password" />
+        <div class="row">
+          <button id="unlock" class="btn">Unlock</button>
+        </div>
+        <div id="unlock-error"></div>
+      </section>
+
+      <section id="unlocked">
+        <div class="address" id="address"></div>
+        <div class="stats">
+          <div class="stat"><span>Status</span><strong id="status-text">idle</strong></div>
+          <div class="stat"><span>Signed</span><strong id="signed">0</strong></div>
+          <div class="stat"><span>Dry-run</span><strong id="dry">0</strong></div>
+          <div class="stat"><span>Manual</span><strong id="manual">0</strong></div>
+          <div class="stat"><span>Rejected</span><strong id="rejected">0</strong></div>
+        </div>
+        <div class="row">
+          <button id="lock" class="btn ghost">Lock</button>
+          <button id="pause" class="btn ghost">Pause</button>
+          <button id="start" class="btn">Start</button>
+        </div>
+        <div id="start-msg"></div>
+      </section>
     </div>
-    <div class="row" style="gap: 6px;">
-      <button id="lock" class="btn ghost">Lock</button>
-      <button id="pause" class="btn ghost">Pause</button>
-      <button id="start" class="btn">Start</button>
-    </div>
-    <div id="start-msg" style="color: #8a93a6; font-size: 11px; margin-top: 8px;"></div>
-  </section>
+  </main>
   <script src="popup.js"></script>
 </body>
 </html>

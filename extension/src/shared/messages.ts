@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const HEX = /^0x[0-9a-fA-F]*$/;
+const PRIVATE_KEY = /^0x[0-9a-fA-F]{64}$/;
 
 export const rpcRequestSchema = z.object({
   type: z.literal("rpc-request"),
@@ -26,6 +27,7 @@ export const unlockSchema = z.object({
 
 export const lockSchema = z.object({ type: z.literal("lock") });
 export const getStatusSchema = z.object({ type: z.literal("get-status") });
+export const getConfigSchema = z.object({ type: z.literal("get-config") });
 export const pauseSchema = z.object({ type: z.literal("pause") });
 export const resumeSchema = z.object({ type: z.literal("resume") });
 export const startSchema = z.object({ type: z.literal("start") });
@@ -33,7 +35,7 @@ export const stopSchema = z.object({ type: z.literal("stop") });
 
 export const importKeySchema = z.object({
   type: z.literal("import-key"),
-  privateKey: z.string().regex(HEX),
+  privateKey: z.string().regex(PRIVATE_KEY),
   password: z.string().min(8),
 });
 
@@ -60,6 +62,7 @@ export const messageSchema = z.discriminatedUnion("type", [
   unlockSchema,
   lockSchema,
   getStatusSchema,
+  getConfigSchema,
   pauseSchema,
   resumeSchema,
   startSchema,

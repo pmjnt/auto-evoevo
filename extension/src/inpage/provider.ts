@@ -59,16 +59,33 @@ export function installProvider(): EIP1193Provider {
     },
   };
 
-  (window as unknown as { ethereum?: EIP1193Provider }).ethereum = provider;
+  const installed = installWindowEthereum(provider);
 
-  window.dispatchEvent(
-    new CustomEvent("eip6963:announceProvider", {
-      detail: Object.freeze({
-        info: { uuid: crypto.randomUUID(), name: "Auto EvoEvo", rdns: "ai.evoevo.auto" },
-        provider,
+  if (installed) {
+    window.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", {
+        detail: Object.freeze({
+          info: { uuid: crypto.randomUUID(), name: "Auto EvoEvo", rdns: "ai.evoevo.auto" },
+          provider,
+        }),
       }),
-    }),
-  );
+    );
+  }
 
   return provider;
+}
+
+function installWindowEthereum(provider: EIP1193Provider): boolean {
+  try {
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      value: provider,
+      writable: true,
+    });
+    return (window as unknown as { ethereum?: EIP1193Provider }).ethereum === provider;
+  } catch {
+    // Some wallets expose window.ethereum as a locked getter. In that case
+    // stay silent to avoid triggering page listeners that try to reassign it.
+    return false;
+  }
 }

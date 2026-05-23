@@ -30,7 +30,7 @@ async function refresh(): Promise<void> {
     return;
   }
   show("unlocked");
-  setText("address", status.address ?? "—");
+  setText("address", status.address ?? "-");
   setText("signed", String(status.counts["signed"] ?? 0));
   setText("dry", String(status.counts["dry_run"] ?? 0));
   setText("manual", String(status.counts["manual_review"] ?? 0));
@@ -72,7 +72,7 @@ document.getElementById("pause")?.addEventListener("click", async () => {
 });
 
 document.getElementById("start")?.addEventListener("click", async () => {
-  setText("start-msg", "Starting…");
+  setText("start-msg", "Starting...");
   const response = (await send({ type: "start" })) as {
     ok: boolean;
     error?: { message: string };
@@ -87,7 +87,7 @@ document.getElementById("start")?.addEventListener("click", async () => {
     "start-msg",
     notified > 0
       ? `Started on ${notified} EvoEvo tab(s).`
-      : "No evoevo.ai tab open — open https://evoevo.ai/feed first.",
+      : "No evoevo.ai tab open - open https://evoevo.ai/feed first.",
   );
   await refresh();
 });

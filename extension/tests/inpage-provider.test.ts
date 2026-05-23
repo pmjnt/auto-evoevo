@@ -1,8 +1,12 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { installProvider, type EIP1193Provider } from "../src/inpage/provider.js";
 
 describe("inpage provider", () => {
+  beforeEach(() => {
+    delete (window as unknown as { ethereum?: unknown }).ethereum;
+  });
+
   it("posts an rpc message and resolves on matching response", async () => {
     const provider: EIP1193Provider = installProvider();
     const requestPromise = provider.request({ method: "eth_chainId" });
@@ -46,6 +50,32 @@ describe("inpage provider", () => {
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(cb).toHaveBeenCalledWith("0x41");
+  });
+
+  it("does not throw when window.ethereum is a getter-only property", () => {
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      get: () => ({ isExistingWallet: true }),
+    });
+
+    const provider = installProvider();
+
+    expect(provider.isAutoEvoEvo).toBe(true);
+    expect((window as unknown as { ethereum?: EIP1193Provider }).ethereum?.isAutoEvoEvo).toBe(true);
+  });
+
+  it("does not announce EIP-6963 when window.ethereum cannot be installed", () => {
+    Object.defineProperty(window, "ethereum", {
+      configurable: false,
+      get: () => ({ isExistingWallet: true }),
+    });
+    const announce = vi.fn();
+    window.addEventListener("eip6963:announceProvider", announce);
+
+    const provider = installProvider();
+
+    expect(provider.isAutoEvoEvo).toBe(true);
+    expect(announce).not.toHaveBeenCalled();
   });
 });
 

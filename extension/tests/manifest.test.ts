@@ -12,6 +12,8 @@ describe("manifest.json", () => {
     expect(manifest.content_scripts[0].run_at).toBe("document_start");
     expect(manifest.background.service_worker).toBe("background.js");
     expect(manifest.action.default_popup).toBe("popup.html");
+    expect(manifest.action.default_icon["128"]).toBe("icons/icon-128.png");
+    expect(manifest.icons["128"]).toBe("icons/icon-128.png");
     expect(manifest.options_page).toBe("options.html");
     expect(manifest.web_accessible_resources[0].resources).toContain("inpage.js");
     expect(manifest.permissions).toEqual(expect.arrayContaining(["storage", "scripting"]));

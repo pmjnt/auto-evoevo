@@ -2,50 +2,279 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Auto EvoEvo — Options</title>
+  <title>Auto EvoEvo Options</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 460px; margin: 0 auto; padding: 24px; background: #0f1115; color: #e6e9ef; }
-    label { display: block; font-size: 12px; color: #8a93a6; margin: 12px 0 4px; }
-    input { width: 100%; padding: 8px 10px; background: #0e1219; border: 1px solid #2a3142; color: #e6e9ef; border-radius: 6px; }
-    button { margin-top: 16px; padding: 8px 12px; border-radius: 6px; background: #7aa2f7; color: #0b0e14; font-weight: 600; border: none; cursor: pointer; }
-    .row { display: flex; gap: 8px; }
-    .row > div { flex: 1; }
-    #msg { margin-top: 12px; font-size: 12px; }
+    * { box-sizing: border-box; }
+    :root {
+      color-scheme: dark;
+      --bg: #080b10;
+      --field: #090e16;
+      --border: #263245;
+      --text: #eef5ff;
+      --muted: #9aa9c0;
+      --soft: #c4d4ee;
+      --blue: #77a7ff;
+      --cyan: #32d4e8;
+      --green: #62d28f;
+    }
+    body {
+      min-width: 560px;
+      margin: 0;
+      padding: 26px;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(50, 212, 232, .10), transparent 24%),
+        radial-gradient(circle at 86% 10%, rgba(119, 167, 255, .10), transparent 26%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .shell {
+      width: min(100%, 680px);
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(96, 121, 158, .32);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(20, 28, 42, .96), rgba(12, 17, 25, .98));
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .36);
+    }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid rgba(96, 121, 158, .24);
+      background: linear-gradient(90deg, rgba(50, 212, 232, .09), rgba(119, 167, 255, .06), transparent);
+    }
+    .logo {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #35e4ef, #76a7ff 58%, #b78cff);
+      color: #031016;
+      font-size: 20px;
+      font-weight: 900;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .36), 0 10px 24px rgba(50, 212, 232, .22);
+    }
+    h1 { margin: 0; font-size: 22px; line-height: 1.15; letter-spacing: 0; }
+    .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .status-pill {
+      margin-left: auto;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--green), #b8f7d1);
+      color: #052017;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .form {
+      display: grid;
+      gap: 14px;
+      padding: 20px 22px 22px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+      margin-bottom: 6px;
+      color: var(--soft);
+      font-size: 12px;
+    }
+    .hint {
+      color: #708198;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    input {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      height: 38px;
+      padding: 9px 11px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      outline: none;
+      background: var(--field);
+      color: var(--text);
+      font: 600 13px/1.2 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      text-overflow: ellipsis;
+    }
+    input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(119, 167, 255, .14);
+    }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px;
+      border: 1px solid rgba(96, 121, 158, .26);
+      border-radius: 8px;
+      background: rgba(8, 13, 21, .68);
+      cursor: pointer;
+    }
+    .switch-copy strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .switch-copy span { display: block; color: var(--muted); font-size: 12px; }
+    .toggle {
+      position: relative;
+      flex: 0 0 auto;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle input {
+      position: absolute;
+      inset: 0;
+      width: 44px;
+      height: 24px;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .toggle-track {
+      display: block;
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: #263245;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+      transition: background .16s ease;
+    }
+    .toggle-track::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform .16s ease;
+    }
+    .toggle input:checked + .toggle-track {
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+    }
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(20px);
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 2px;
+    }
+    .save-note {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    button {
+      min-height: 36px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--blue), #91b9ff);
+      color: #06101d;
+      cursor: pointer;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 8px 18px rgba(119, 167, 255, .2);
+    }
+    #msg { min-height: 16px; color: var(--green); font-size: 12px; }
+    @media (max-width: 620px) {
+      body { min-width: 0; padding: 14px; }
+      .row { grid-template-columns: 1fr; }
+      .status-pill { display: none; }
+      .actions { align-items: stretch; flex-direction: column; }
+      button { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <h1>Options</h1>
+  <main class="shell">
+    <header class="hero">
+      <div class="logo">E</div>
+      <div>
+        <h1>Auto EvoEvo</h1>
+        <p class="subtitle">Guarded 0G signer for ADD TO MEMORY</p>
+      </div>
+      <div class="status-pill">Dry-run ready</div>
+    </header>
 
-  <label>0G RPC URL</label>
-  <input id="rpcUrl" />
+    <section class="form">
+      <div class="field">
+        <label class="field-label" for="rpcUrl"><span>0G RPC URL</span><span class="hint">Mainnet</span></label>
+        <input id="rpcUrl" />
+      </div>
 
-  <div class="row">
-    <div><label>Chain id</label><input id="chainId" /></div>
-    <div><label>Max fee (OG)</label><input id="maxFeeNative" /></div>
-  </div>
+      <div class="row">
+        <div class="field">
+          <label class="field-label" for="chainId"><span>Chain id</span></label>
+          <input id="chainId" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="maxFeeNative"><span>Max fee (OG)</span></label>
+          <input id="maxFeeNative" />
+        </div>
+      </div>
 
-  <label>Allowed contracts (comma-separated)</label>
-  <input id="allowedContracts" />
+      <div class="field">
+        <label class="field-label" for="allowedContracts"><span>Allowed contracts</span><span class="hint">comma-separated</span></label>
+        <input id="allowedContracts" />
+      </div>
 
-  <label>Allowed function selectors (comma-separated)</label>
-  <input id="allowedFunctionSelectors" />
+      <div class="field">
+        <label class="field-label" for="allowedFunctionSelectors"><span>Allowed function selectors</span><span class="hint">4-byte selectors</span></label>
+        <input id="allowedFunctionSelectors" />
+      </div>
 
-  <label>Idle-lock minutes</label>
-  <input id="idleLockMinutes" />
+      <div class="field">
+        <label class="field-label" for="idleLockMinutes"><span>Idle-lock minutes</span></label>
+        <input id="idleLockMinutes" />
+      </div>
 
-  <label>
-    <input type="checkbox" id="dryRun" checked />
-    Dry-run mode (do not actually sign transactions)
-  </label>
+      <label class="switch-row" for="dryRun">
+        <span class="switch-copy">
+          <strong>Dry-run mode</strong>
+          <span>Preview every flow without signing transactions.</span>
+        </span>
+        <span class="toggle">
+          <input type="checkbox" id="dryRun" checked />
+          <span class="toggle-track"></span>
+        </span>
+      </label>
 
-  <label>Private key (one-time import; cleared on save)</label>
-  <input id="privateKey" type="password" />
+      <div class="row">
+        <div class="field">
+          <label class="field-label" for="privateKey"><span>Private key</span><span class="hint">cleared on save</span></label>
+          <input id="privateKey" type="password" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="password"><span>Master password</span></label>
+          <input id="password" type="password" />
+        </div>
+      </div>
 
-  <label>Master password (for the new vault)</label>
-  <input id="password" type="password" />
-
-  <button id="save">Save</button>
-  <div id="msg"></div>
+      <div class="actions">
+        <div>
+          <div class="save-note">Key is encrypted locally in chrome.storage.local.</div>
+          <div id="msg"></div>
+        </div>
+        <button id="save">Save configuration</button>
+      </div>
+    </section>
+  </main>
   <script src="options.js"></script>
 </body>
 </html>
