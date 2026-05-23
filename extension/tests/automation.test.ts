@@ -6,6 +6,7 @@ import { buildFeedDom } from "./fixtures/dom-feed.js";
 describe("automation loop", () => {
   afterEach(() => {
     vi.useRealTimers();
+    document.body.innerHTML = "";
   });
 
   it("clicks every visible ADD TO MEMORY button then stops", async () => {
@@ -73,7 +74,8 @@ describe("automation loop", () => {
     ]);
   });
 
-  it("requests a reload and stops when a submitting modal appears after approval", async () => {
+  it("waits briefly before requesting a reload when a submitting modal appears", async () => {
+    vi.useFakeTimers();
     buildFeedDom(2);
     const buttons = Array.from(document.querySelectorAll("button"));
     const firstButton = buttons[0] as HTMLButtonElement;
@@ -91,13 +93,86 @@ describe("automation loop", () => {
       clicked.push("second");
     });
 
-    await runAutomation({
+    const runPromise = runAutomation({
       nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
+      modalRefreshDelayMs: 1_000,
       onEvent: (event) => events.push(event.type),
     });
 
+    await vi.advanceTimersByTimeAsync(999);
+    expect(events).toEqual(["started", "clicked", "approved"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await runPromise;
+
     expect(clicked).toEqual(["first"]);
     expect(events).toEqual(["started", "clicked", "approved", "reload_requested"]);
+  });
+
+  it("waits for feed controls to appear after a reload before declaring done", async () => {
+    vi.useFakeTimers();
+    const events: string[] = [];
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+
+    const runPromise = runAutomation({
+      nextOutcome,
+      emptyFeedTimeoutMs: 1_000,
+      onEvent: (event) => events.push(event.type),
+    });
+
+    await vi.advanceTimersByTimeAsync(500);
+    buildFeedDom(1);
+    await vi.runOnlyPendingTimersAsync();
+    await runPromise;
+
+    expect(nextOutcome).toHaveBeenCalledTimes(1);
+    expect(events).toContain("clicked");
+    expect(events.at(-1)).toBe("done");
+  });
+
+  it("stops when remaining items are at or below the buffer and show more is unavailable", async () => {
+    buildFeedDom(1);
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+    const events: string[] = [];
+
+    await runAutomation({
+      nextOutcome,
+      stopAtRemaining: 1,
+      onEvent: (event) => events.push(event.type),
+    });
+
+    expect(nextOutcome).not.toHaveBeenCalled();
+    expect(events).toEqual(["started", "done"]);
+  });
+
+  it("keeps running at the buffer while show more is still available", async () => {
+    buildFeedDom(2, true);
+    const showMore = Array.from(document.querySelectorAll("button")).find((button) =>
+      /show more/i.test(button.textContent ?? ""),
+    ) as HTMLButtonElement;
+    showMore.addEventListener("click", () => {
+      showMore.remove();
+      const article = document.createElement("article");
+      const button = document.createElement("button");
+      button.textContent = "ADD TO MEMORY";
+      article.append(button);
+      document.body.append(article);
+    });
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+
+    await runAutomation({
+      nextOutcome,
+      stopAtRemaining: 1,
+      onEvent: () => undefined,
+    });
+
+    const unmarked = Array.from(document.querySelectorAll("button")).filter(
+      (button) =>
+        /add to memory/i.test(button.textContent ?? "") &&
+        !button.hasAttribute("data-auto-evoevo-attempted-id"),
+    );
+    expect(nextOutcome).toHaveBeenCalledTimes(2);
+    expect(unmarked).toHaveLength(1);
   });
 
   it("does not wait on a hidden retained submitting modal", async () => {

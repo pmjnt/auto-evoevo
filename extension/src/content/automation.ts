@@ -1,6 +1,9 @@
 const MARKER = "data-auto-evoevo-attempted-id";
 const IDLE_LIMIT = 2;
 const DEFAULT_OUTCOME_TIMEOUT_MS = 10_000;
+const DEFAULT_EMPTY_FEED_TIMEOUT_MS = 30_000;
+const DEFAULT_MODAL_REFRESH_DELAY_MS = 2_000;
+const DOM_POLL_MS = 250;
 
 export type AutomationEvent =
   | { type: "started" }
@@ -19,6 +22,8 @@ export type AutomationDeps = {
   onEvent: (event: AutomationEvent) => void;
   cooldownMs?: number;
   outcomeTimeoutMs?: number;
+  emptyFeedTimeoutMs?: number;
+  modalRefreshDelayMs?: number;
   // Stop when the count of unmarked ADD TO MEMORY buttons drops to this
   // number AND no SHOW MORE button is available. Acts as a buffer so we
   // don't drain the feed when we can't refill.
@@ -36,6 +41,14 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
     1,
     deps.outcomeTimeoutMs ?? DEFAULT_OUTCOME_TIMEOUT_MS,
   );
+  const emptyFeedTimeoutMs = Math.max(
+    1,
+    deps.emptyFeedTimeoutMs ?? DEFAULT_EMPTY_FEED_TIMEOUT_MS,
+  );
+  const modalRefreshDelayMs = Math.max(
+    0,
+    deps.modalRefreshDelayMs ?? DEFAULT_MODAL_REFRESH_DELAY_MS,
+  );
   let attemptId = 0;
   let idleExpansions = 0;
   let index = 0;
@@ -49,7 +62,11 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
     if (button === null) {
       const expanded = await tryShowMore();
       if (expanded) idleExpansions = 0;
-      else idleExpansions += 1;
+      else if (!hasFeedControls() && (await waitForFeedControls(emptyFeedTimeoutMs))) {
+        idleExpansions = 0;
+      } else {
+        idleExpansions += 1;
+      }
       continue;
     }
 
@@ -64,6 +81,7 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
     if (outcome.ok) {
       deps.onEvent({ type: "approved", txHash: outcome.txHash });
       if (hasSubmittingModal()) {
+        if (modalRefreshDelayMs > 0) await sleep(modalRefreshDelayMs);
         deps.onEvent({ type: "reload_requested" });
         return;
       }
@@ -115,6 +133,23 @@ async function waitForOutcome(
         });
       });
   });
+}
+
+async function waitForFeedControls(timeoutMs: number): Promise<boolean> {
+  if (hasFeedControls()) return true;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await sleep(DOM_POLL_MS);
+    if (hasFeedControls()) return true;
+  }
+  return hasFeedControls();
+}
+
+function hasFeedControls(): boolean {
+  const buttons = Array.from(document.querySelectorAll("button"));
+  return buttons.some((button) =>
+    /add to memory|show more/i.test(button.textContent ?? ""),
+  );
 }
 
 function hasSubmittingModal(): boolean {
