@@ -73,14 +73,14 @@ describe("automation loop", () => {
     ]);
   });
 
-  it("waits for the submitting modal to close before clicking the next item", async () => {
-    vi.useFakeTimers();
+  it("requests a reload and stops when a submitting modal appears after approval", async () => {
     buildFeedDom(2);
     const buttons = Array.from(document.querySelectorAll("button"));
     const firstButton = buttons[0] as HTMLButtonElement;
     const secondButton = buttons[1] as HTMLButtonElement;
     const modal = document.createElement("div");
     const clicked: string[] = [];
+    const events: string[] = [];
 
     firstButton.addEventListener("click", () => {
       clicked.push("first");
@@ -91,23 +91,13 @@ describe("automation loop", () => {
       clicked.push("second");
     });
 
-    const runPromise = runAutomation({
+    await runAutomation({
       nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
-      modalCloseTimeoutMs: 1_000,
-      onEvent: () => undefined,
+      onEvent: (event) => events.push(event.type),
     });
 
-    await Promise.resolve();
     expect(clicked).toEqual(["first"]);
-
-    await vi.advanceTimersByTimeAsync(500);
-    expect(clicked).toEqual(["first"]);
-
-    modal.remove();
-    await vi.advanceTimersByTimeAsync(250);
-    await runPromise;
-
-    expect(clicked).toEqual(["first", "second"]);
+    expect(events).toEqual(["started", "clicked", "approved", "reload_requested"]);
   });
 
   it("does not wait on a hidden retained submitting modal", async () => {
@@ -131,7 +121,6 @@ describe("automation loop", () => {
 
     await runAutomation({
       nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
-      modalCloseTimeoutMs: 1_000,
       onEvent: () => undefined,
     });
 

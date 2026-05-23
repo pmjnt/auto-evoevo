@@ -83,52 +83,6 @@ describe("background router", () => {
     await handleMessage({ type: "resume" }, {} as chrome.runtime.MessageSender);
   });
 
-  it("starts automation in a dedicated EvoEvo tab", async () => {
-    const response = await handleMessage(
-      { type: "start-dedicated" },
-      {} as chrome.runtime.MessageSender,
-    );
-
-    expect(response).toMatchObject({
-      ok: true,
-      tabId: 1,
-      created: true,
-      tabsNotified: 1,
-    });
-    expect(chromeApi.tabs._tabs()).toMatchObject([
-      { id: 1, url: "https://evoevo.ai/feed?chainId=16661" },
-    ]);
-    expect(chromeApi.tabs._messages()).toMatchObject([
-      {
-        tabId: 1,
-        message: {
-          type: "start-automation",
-          cooldownMs: 0,
-          stopAtRemaining: 0,
-        },
-      },
-    ]);
-  });
-
-  it("reports when the dedicated automation tab is closed", async () => {
-    const startResponse = await handleMessage(
-      { type: "start-dedicated" },
-      {} as chrome.runtime.MessageSender,
-    );
-    const tabId = (startResponse as unknown as { tabId: number }).tabId;
-
-    chromeApi.tabs._remove(tabId);
-
-    const status = await handleMessage(
-      { type: "get-status" },
-      {} as chrome.runtime.MessageSender,
-    );
-    expect(status).toMatchObject({
-      ok: true,
-      automationTab: { state: "closed", id: tabId },
-    });
-  });
-
   it("updates paused status from automation paused events", async () => {
     await handleMessage({ type: "resume" }, {} as chrome.runtime.MessageSender);
 
@@ -141,6 +95,34 @@ describe("background router", () => {
       { type: "get-status" },
       {} as chrome.runtime.MessageSender,
     );
-    expect(status).toMatchObject({ ok: true, paused: true });
+    expect(status).toMatchObject({
+      ok: true,
+      paused: true,
+      lastError: "Timed out waiting for transaction after click",
+    });
+  });
+
+  it("reloads and resumes the sender tab after a reload_requested event", async () => {
+    chromeApi.tabs._add({ id: 7, url: "https://evoevo.ai/feed?chainId=16661" });
+
+    const response = await handleMessage(
+      { type: "automation-event", event: { type: "reload_requested" } },
+      { tab: { id: 7, url: "https://evoevo.ai/feed?chainId=16661" } } as chrome.runtime.MessageSender,
+    );
+
+    expect(response).toMatchObject({ ok: true });
+    expect(chromeApi.tabs._reloads()).toEqual([7]);
+
+    chromeApi.tabs._complete(7);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(chromeApi.tabs._messages().at(-1)).toMatchObject({
+      tabId: 7,
+      message: {
+        type: "start-automation",
+        cooldownMs: 0,
+        stopAtRemaining: 0,
+      },
+    });
   });
 });

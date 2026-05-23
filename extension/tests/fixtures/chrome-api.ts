@@ -62,8 +62,14 @@ class FakeStorageArea {
 class FakeTabsApi {
   private tabs: chrome.tabs.Tab[] = [];
   private messages: Array<{ tabId: number; message: unknown }> = [];
+  private reloads: number[] = [];
   private nextId = 1;
   private removedListeners: Array<(tabId: number) => void> = [];
+  private updatedListeners: Array<(
+    tabId: number,
+    changeInfo: chrome.tabs.TabChangeInfo,
+    tab: chrome.tabs.Tab,
+  ) => void> = [];
 
   query = async (queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> => {
     const urlPattern = typeof queryInfo.url === "string" ? queryInfo.url : null;
@@ -97,12 +103,37 @@ class FakeTabsApi {
     this.messages.push({ tabId, message });
   };
 
+  reload = async (tabId?: number): Promise<void> => {
+    if (tabId !== undefined) this.reloads.push(tabId);
+  };
+
   onRemoved = {
     addListener: (listener: (tabId: number) => void) => {
       this.removedListeners.push(listener);
     },
     removeListener: (listener: (tabId: number) => void) => {
       this.removedListeners = this.removedListeners.filter((item) => item !== listener);
+    },
+  };
+
+  onUpdated = {
+    addListener: (
+      listener: (
+        tabId: number,
+        changeInfo: chrome.tabs.TabChangeInfo,
+        tab: chrome.tabs.Tab,
+      ) => void,
+    ) => {
+      this.updatedListeners.push(listener);
+    },
+    removeListener: (
+      listener: (
+        tabId: number,
+        changeInfo: chrome.tabs.TabChangeInfo,
+        tab: chrome.tabs.Tab,
+      ) => void,
+    ) => {
+      this.updatedListeners = this.updatedListeners.filter((item) => item !== listener);
     },
   };
 
@@ -127,6 +158,10 @@ class FakeTabsApi {
     return [...this.messages];
   }
 
+  _reloads(): number[] {
+    return [...this.reloads];
+  }
+
   _tabs(): chrome.tabs.Tab[] {
     return [...this.tabs];
   }
@@ -134,6 +169,14 @@ class FakeTabsApi {
   _remove(tabId: number): void {
     this.tabs = this.tabs.filter((tab) => tab.id !== tabId);
     for (const listener of this.removedListeners) listener(tabId);
+  }
+
+  _complete(tabId: number): void {
+    const tab = this.tabs.find((item) => item.id === tabId);
+    if (!tab) return;
+    for (const listener of this.updatedListeners) {
+      listener(tabId, { status: "complete" }, tab);
+    }
   }
 }
 

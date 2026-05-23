@@ -6,10 +6,7 @@ type Status = {
   address: string | null;
   paused: boolean;
   counts: Record<string, number>;
-  automationTab?: {
-    state: "none" | "ready" | "closed";
-    id: number | null;
-  };
+  lastError?: string | null;
 };
 
 function show(id: "locked" | "unlocked"): void {
@@ -39,7 +36,7 @@ async function refresh(): Promise<void> {
   setText("dry", String(status.counts["dry_run"] ?? 0));
   setText("manual", String(status.counts["manual_review"] ?? 0));
   setText("rejected", String(status.counts["rejected"] ?? 0));
-  setText("automation-tab", automationTabLabel(status.automationTab));
+  setText("runtime-error", status.lastError ?? "");
 
   const statusText = status.paused ? "paused" : "running";
   setText("status-text", statusText);
@@ -77,50 +74,28 @@ document.getElementById("pause")?.addEventListener("click", async () => {
 });
 
 document.getElementById("start")?.addEventListener("click", async () => {
-  await startAutomation("start");
+  await startAutomation();
 });
 
-document.getElementById("start-dedicated")?.addEventListener("click", async () => {
-  await startAutomation("start-dedicated");
-});
-
-async function startAutomation(type: "start" | "start-dedicated"): Promise<void> {
+async function startAutomation(): Promise<void> {
   setText("start-msg", "Starting...");
-  const response = (await send({ type })) as {
+  const response = (await send({ type: "start" })) as {
     ok: boolean;
     error?: { message: string };
     tabsNotified?: number;
-    tabId?: number;
-    created?: boolean;
   };
   if (!response.ok) {
     setText("start-msg", response.error?.message ?? "Failed to start");
     return;
   }
   const notified = response.tabsNotified ?? 0;
-  if (type === "start-dedicated") {
-    const action = response.created ? "Created and started" : "Started";
-    setText(
-      "start-msg",
-      notified > 0
-        ? `${action} dedicated tab #${response.tabId ?? "-"}.`
-        : "Dedicated tab is open, but the content script did not respond yet. Refresh the tab and try again.",
-    );
-  } else {
-    setText(
-      "start-msg",
-      notified > 0
-        ? `Started on ${notified} EvoEvo tab(s).`
-        : "No evoevo.ai tab open - open https://evoevo.ai/feed first.",
-    );
-  }
+  setText(
+    "start-msg",
+    notified > 0
+      ? `Started on ${notified} EvoEvo tab(s).`
+      : "No evoevo.ai tab open - open https://evoevo.ai/feed first.",
+  );
   await refresh();
-}
-
-function automationTabLabel(tab: Status["automationTab"]): string {
-  if (!tab || tab.state === "none") return "none";
-  if (tab.state === "closed") return `closed #${tab.id}`;
-  return `ready #${tab.id}`;
 }
 
 void refresh();

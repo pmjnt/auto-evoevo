@@ -149,14 +149,16 @@
       line-height: 1.1;
     }
     #status-text { color: var(--green); }
-    #unlock-error, #start-msg {
+    #unlock-error, #start-msg, #runtime-error {
       min-height: 16px;
       margin-top: 10px;
       color: var(--muted);
       font-size: 11px;
       line-height: 1.35;
+      overflow-wrap: anywhere;
     }
     #unlock-error { color: var(--red); }
+    #runtime-error { color: var(--red); }
     section { display: none; }
     section.active { display: block; }
   </style>
@@ -196,15 +198,14 @@
           <div class="stat"><span>Dry-run</span><strong id="dry">0</strong></div>
           <div class="stat"><span>Manual</span><strong id="manual">0</strong></div>
           <div class="stat"><span>Rejected</span><strong id="rejected">0</strong></div>
-          <div class="stat"><span>Auto tab</span><strong id="automation-tab">none</strong></div>
         </div>
         <div class="row wrap">
           <button id="lock" class="btn ghost">Lock</button>
           <button id="pause" class="btn ghost">Pause</button>
-          <button id="start" class="btn ghost">Start all</button>
-          <button id="start-dedicated" class="btn">Start dedicated</button>
+          <button id="start" class="btn">Start</button>
         </div>
         <div id="start-msg"></div>
+        <div id="runtime-error"></div>
       </section>
     </div>
   </main>
