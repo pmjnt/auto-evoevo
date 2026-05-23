@@ -50,6 +50,16 @@ export class RpcClient {
     return BigInt(hex);
   }
 
+  async estimateGas(tx: {
+    to: string;
+    data: string;
+    value?: string;
+    from?: string;
+  }): Promise<bigint> {
+    const hex = await this.call<string>("eth_estimateGas", [tx]);
+    return BigInt(hex);
+  }
+
   async getTransactionReceipt(hash: string): Promise<unknown | null> {
     return await this.call<unknown | null>("eth_getTransactionReceipt", [hash]);
   }

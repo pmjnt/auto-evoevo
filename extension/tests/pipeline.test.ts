@@ -35,6 +35,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
       rpc: {
         getTransactionCount: vi.fn(async () => 7),
         gasPrice: vi.fn(async () => 1_000_000_000n),
+        estimateGas: vi.fn(async () => 50_000n),
         sendRawTransaction: vi.fn(async (raw: string) => {
           broadcasted.push(raw);
           return "0xtx";
