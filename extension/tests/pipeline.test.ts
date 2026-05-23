@@ -13,6 +13,7 @@ const config: ExtensionConfig = {
   maxFeeNative: 0.001,
   dryRun: false,
   idleLockMinutes: 30,
+  cooldownSeconds: 0,
 };
 
 function makeDeps(overrides: Record<string, unknown> = {}) {

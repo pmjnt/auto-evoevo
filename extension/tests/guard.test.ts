@@ -12,6 +12,7 @@ const baseConfig: ExtensionConfig = {
   maxFeeNative: 0.001,
   dryRun: true,
   idleLockMinutes: 30,
+  cooldownSeconds: 0,
 };
 
 const baseRequest: WalletRequest = {

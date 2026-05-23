@@ -24,6 +24,7 @@ document.getElementById("save")?.addEventListener("click", async () => {
     maxFeeNative: Number(value("maxFeeNative")),
     dryRun: dryRunEl?.checked ?? true,
     idleLockMinutes: Number(value("idleLockMinutes")) || 30,
+    cooldownSeconds: Math.max(0, Math.min(300, Number(value("cooldownSeconds")) || 0)),
   };
 
   const setConfig = await send({ type: "set-config", config });

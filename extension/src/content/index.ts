@@ -51,12 +51,22 @@ window.addEventListener("message", (event: MessageEvent) => {
 let automationRunning = false;
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
-  const value = message as { type?: string; event?: string; value?: unknown };
+  const value = message as {
+    type?: string;
+    event?: string;
+    value?: unknown;
+    cooldownMs?: number;
+  };
   if (value?.type === "start-automation") {
     if (automationRunning) return;
     automationRunning = true;
+    const cooldownMs =
+      typeof value.cooldownMs === "number" && value.cooldownMs >= 0
+        ? value.cooldownMs
+        : 0;
     void runAutomation({
       nextOutcome,
+      cooldownMs,
       onEvent: (event) => chrome.runtime.sendMessage({ type: "automation-event", event }),
     }).finally(() => {
       automationRunning = false;

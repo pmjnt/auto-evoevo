@@ -21,6 +21,7 @@ const fakeConfig: ExtensionConfig = {
   maxFeeNative: 0.001,
   dryRun: true,
   idleLockMinutes: 30,
+  cooldownSeconds: 0,
 };
 
 describe("storage", () => {
