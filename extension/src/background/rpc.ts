@@ -8,10 +8,19 @@ type RpcResponse<T> = {
 };
 
 export class RpcClient {
+  private readonly fetchFn: typeof fetch;
+
   constructor(
     private readonly url: string,
-    private readonly fetchFn: typeof fetch = fetch,
-  ) {}
+    fetchFn?: typeof fetch,
+  ) {
+    // Bind to globalThis so the worker's `fetch` keeps its receiver
+    // when we call it as a class property. Without bind, calling
+    // `this.fetchFn(...)` inside a service worker throws 'Illegal
+    // invocation' because fetch requires `this === globalThis`. Vitest
+    // in Node is permissive about the receiver so unit tests missed it.
+    this.fetchFn = fetchFn ?? fetch.bind(globalThis);
+  }
 
   async sendRawTransaction(signed: string): Promise<string> {
     const result = await this.call<string>("eth_sendRawTransaction", [signed]);
