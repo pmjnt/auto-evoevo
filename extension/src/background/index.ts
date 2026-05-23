@@ -7,6 +7,7 @@ import { runPipeline } from "./pipeline.js";
 
 const wallet = new Wallet();
 const log = new SessionLog();
+const PENDING_AUTOMATION_RESUME_TAB_ID = "pendingAutomationResumeTabId";
 let paused = false;
 let reloadResumeTabId: number | null = null;
 let lastError: string | null = null;
@@ -334,7 +335,16 @@ async function reloadSenderTab(
   reloadResumeTabId = tabId;
   paused = false;
   lastError = "Reloading EvoEvo after submitted transaction...";
-  await chrome.tabs.reload(tabId);
+  await setPendingAutomationResumeTabId(tabId);
+  try {
+    await chrome.tabs.reload(tabId);
+  } catch (error) {
+    reloadResumeTabId = null;
+    await clearPendingAutomationResumeTabId();
+    paused = true;
+    lastError = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: { code: 4001, message: lastError } };
+  }
   return { ok: true, reloading: true, tabId };
 }
 
@@ -349,12 +359,22 @@ function installTabLifecycleListener(): void {
   if (typeof chrome === "undefined" || !chrome.tabs?.onUpdated) return;
   if (tabLifecycleListenerInstalled && tabLifecycleSource === chrome.tabs) return;
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (tabId !== reloadResumeTabId || changeInfo.status !== "complete") return;
-    reloadResumeTabId = null;
-    void resumeAutomationInTab(tabId);
+    void handleTabUpdated(tabId, changeInfo);
   });
   tabLifecycleListenerInstalled = true;
   tabLifecycleSource = chrome.tabs;
+}
+
+async function handleTabUpdated(
+  tabId: number,
+  changeInfo: chrome.tabs.TabChangeInfo,
+): Promise<void> {
+  if (changeInfo.status !== "complete") return;
+  const pendingTabId = await getPendingAutomationResumeTabId();
+  if (tabId !== reloadResumeTabId && tabId !== pendingTabId) return;
+  reloadResumeTabId = null;
+  await clearPendingAutomationResumeTabId();
+  await resumeAutomationInTab(tabId);
 }
 
 async function resumeAutomationInTab(tabId: number): Promise<void> {
@@ -372,6 +392,23 @@ async function resumeAutomationInTab(tabId: number): Promise<void> {
     lastError =
       "Reloaded EvoEvo tab but the content script did not respond. Press Start again.";
   }
+}
+
+async function setPendingAutomationResumeTabId(tabId: number): Promise<void> {
+  if (typeof chrome === "undefined" || !chrome.storage?.session) return;
+  await chrome.storage.session.set({ [PENDING_AUTOMATION_RESUME_TAB_ID]: tabId });
+}
+
+async function getPendingAutomationResumeTabId(): Promise<number | null> {
+  if (typeof chrome === "undefined" || !chrome.storage?.session) return null;
+  const stored = await chrome.storage.session.get(PENDING_AUTOMATION_RESUME_TAB_ID);
+  const value = stored[PENDING_AUTOMATION_RESUME_TAB_ID];
+  return typeof value === "number" ? value : null;
+}
+
+async function clearPendingAutomationResumeTabId(): Promise<void> {
+  if (typeof chrome === "undefined" || !chrome.storage?.session) return;
+  await chrome.storage.session.remove(PENDING_AUTOMATION_RESUME_TAB_ID);
 }
 
 installTabLifecycleListener();

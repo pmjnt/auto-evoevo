@@ -125,4 +125,25 @@ describe("background router", () => {
       },
     });
   });
+
+  it("resumes a reloaded tab from session state after background memory is lost", async () => {
+    chromeApi.tabs._add({ id: 7, url: "https://evoevo.ai/feed?chainId=16661" });
+    await chromeApi.session.set({ pendingAutomationResumeTabId: 7 });
+    await handleMessage({ type: "get-status" }, {} as chrome.runtime.MessageSender);
+
+    chromeApi.tabs._complete(7);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(chromeApi.tabs._messages().at(-1)).toMatchObject({
+      tabId: 7,
+      message: {
+        type: "start-automation",
+        cooldownMs: 0,
+        stopAtRemaining: 0,
+      },
+    });
+    expect(chromeApi.session._peek()).not.toHaveProperty(
+      "pendingAutomationResumeTabId",
+    );
+  });
 });
