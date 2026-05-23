@@ -96,16 +96,24 @@ Hoặc disable Rabby toàn cục khi automation đang chạy (`chrome://extensio
 
 > Nếu sau này muốn dùng lại Rabby trên evoevo.ai → bật lại, nhưng nhớ disable Auto EvoEvo nếu không cần.
 
+### Lưu ý về wallet picker của EvoEvo
+
+EvoEvo dùng Reown (WalletConnect) modal. Modal này chỉ list các ví trong WalletConnect Cloud registry — **không có "Auto EvoEvo"** dù mình announce qua EIP-6963.
+
+**Workaround:** extension set `window.ethereum.isMetaMask = true` (de-facto convention, Rabby/Brave/Trust đều làm vậy). Trong picker bạn **click "MetaMask"** — Reown sẽ gọi `window.ethereum` (chính là Auto EvoEvo nếu Rabby tắt) → connect bình thường.
+
+Tức là: picker hiện icon con cáo MetaMask, nhưng thực ra đang connect bằng burner key của Auto EvoEvo.
+
 ---
 
 ## 5. Chạy thử (Dry-run)
 
 **Mục đích:** xác nhận extension đọc đúng giao dịch EvoEvo build mà KHÔNG thực sự ký.
 
-1. Mở tab `https://evoevo.ai/feed`. Đăng nhập nếu cần.
+1. Mở tab `https://evoevo.ai`. Bấm **Connect** (góc phải trên) → picker mở → click **"MetaMask"** (đây thực ra là Auto EvoEvo, xem lưu ý ở bước 4). Connect xong, vào tab **FEED**.
 2. Bấm icon extension → popup hiện form nhập password.
-3. Nhập master password đã set ở bước 3 → bấm **Unlock**.
-4. Popup chuyển sang trạng thái unlocked, hiện địa chỉ ví + dòng **Status** + counter `Signed/Dry-run/Manual/Rejected`.
+3. Nhập master password đã set ở bước 3 cấu hình → bấm **Unlock**.
+4. Popup chuyển sang trạng thái unlocked, hiện địa chỉ ví + dòng **Status** + counter `Signed/Dry-run/Manual/Rejected`. Nếu page chưa thấy account, refresh hoặc click Connect lại — extension sẽ broadcast `accountsChanged` event.
 5. Bấm **Start** trong popup. Dòng status chuyển sang `running` (màu xanh), và popup hiện `Started on N EvoEvo tab(s).` ở dưới.
 
    > Nếu thấy `No evoevo.ai tab open`: mở `https://evoevo.ai/feed` trước, rồi bấm Start lại.
