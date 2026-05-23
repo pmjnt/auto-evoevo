@@ -1,5 +1,10 @@
 export type EIP1193Provider = {
   isAutoEvoEvo: true;
+  // De-facto identity flags so wallet pickers that key off
+  // `window.ethereum.isXxx` (instead of EIP-6963) still treat us as a
+  // valid injected wallet. Many extensions (Rabby, Brave, Trust) set
+  // isMetaMask=true for the same reason.
+  isMetaMask: true;
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   on: (event: string, listener: (...args: unknown[]) => void) => void;
   removeListener: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -39,6 +44,7 @@ export function installProvider(): EIP1193Provider {
 
   const provider: EIP1193Provider = {
     isAutoEvoEvo: true,
+    isMetaMask: true,
     request: async ({ method, params }) => {
       const id = crypto.randomUUID();
       return await new Promise<unknown>((resolve, reject) => {
