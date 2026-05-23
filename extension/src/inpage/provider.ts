@@ -1,9 +1,21 @@
+// Two-mode provider:
+//
+//  proxy mode: another wallet (typically Rabby) already injected
+//  `window.ethereum`. We wrap it with a Proxy that forwards every
+//  request to the real provider EXCEPT eth_sendTransaction, which we
+//  route through our own background pipeline so it can be auto-signed
+//  without the host wallet's popup. Connect / eth_requestAccounts /
+//  personal_sign still flow through the host wallet.
+//
+//  standalone mode: nothing else is injected. We install our own
+//  EIP-1193 provider, announce via EIP-6963, and spoof isMetaMask so
+//  registry-only pickers (Reown / WalletConnect) can still find us.
+//
+// Re-evaluated every 200 ms so a wallet that injects after us still
+// gets wrapped.
+
 export type EIP1193Provider = {
   isAutoEvoEvo: true;
-  // De-facto identity flags so wallet pickers that key off
-  // `window.ethereum.isXxx` (instead of EIP-6963) still treat us as a
-  // valid injected wallet. Many extensions (Rabby, Brave, Trust) set
-  // isMetaMask=true for the same reason.
   isMetaMask: true;
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   on: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -17,11 +29,23 @@ type Pending = {
 
 const SOURCE_PAGE = "auto-evoevo-page";
 const SOURCE_EXT = "auto-evoevo-ext";
+const WRAPPED_MARKER = Symbol.for("auto-evoevo.wrapped");
 
-export function installProvider(): EIP1193Provider {
-  const pending = new Map<string, Pending>();
-  const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+const pending = new Map<string, Pending>();
+const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
+function backgroundRequest(method: string, params: unknown[]): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const id = crypto.randomUUID();
+    pending.set(id, { resolve, reject });
+    window.postMessage(
+      { source: SOURCE_PAGE, target: "ext", type: "rpc-request", id, method, params },
+      "*",
+    );
+  });
+}
+
+function installMessageBridge(): void {
   window.addEventListener("message", (event: MessageEvent) => {
     const data = event.data;
     if (data?.source !== SOURCE_EXT || data?.target !== "page") return;
@@ -31,7 +55,12 @@ export function installProvider(): EIP1193Provider {
       if (!handler) return;
       pending.delete(data.id);
       if (data.ok) handler.resolve(data.result);
-      else handler.reject(Object.assign(new Error(data.error?.message ?? "Error"), { code: data.error?.code ?? -1 }));
+      else
+        handler.reject(
+          Object.assign(new Error(data.error?.message ?? "Error"), {
+            code: data.error?.code ?? -1,
+          }),
+        );
       return;
     }
 
@@ -41,20 +70,14 @@ export function installProvider(): EIP1193Provider {
       for (const listener of set) listener(data.value);
     }
   });
+}
 
-  const provider: EIP1193Provider = {
+function makeStandaloneProvider(): EIP1193Provider {
+  const provider: EIP1193Provider & { [WRAPPED_MARKER]?: true } = {
     isAutoEvoEvo: true,
     isMetaMask: true,
-    request: async ({ method, params }) => {
-      const id = crypto.randomUUID();
-      return await new Promise<unknown>((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        window.postMessage(
-          { source: SOURCE_PAGE, target: "ext", type: "rpc-request", id, method, params: params ?? [] },
-          "*",
-        );
-      });
-    },
+    request: async ({ method, params }) =>
+      backgroundRequest(method, params ?? []),
     on: (event, listener) => {
       const set = listeners.get(event) ?? new Set();
       set.add(listener);
@@ -64,38 +87,52 @@ export function installProvider(): EIP1193Provider {
       listeners.get(event)?.delete(listener);
     },
   };
-
-  (window as unknown as { ethereum?: EIP1193Provider }).ethereum = provider;
-
-  // EIP-6963 wallet discovery. We announce once on install and also respond
-  // to requestProvider so dApps that mount AFTER us (e.g. Reown / Web3Modal)
-  // still discover the wallet. A stable uuid lets pickers dedupe across
-  // multiple announces.
-  const announceDetail = Object.freeze({
-    info: {
-      uuid: "auto-evoevo-0001-0000-0000-000000000001",
-      name: "Auto EvoEvo",
-      rdns: "ai.evoevo.auto",
-      icon: PROVIDER_ICON_DATA_URL,
-    },
-    provider,
-  });
-
-  const announce = (): void => {
-    window.dispatchEvent(
-      new CustomEvent("eip6963:announceProvider", { detail: announceDetail }),
-    );
-  };
-
-  window.addEventListener("eip6963:requestProvider", announce);
-  announce();
-
+  provider[WRAPPED_MARKER] = true;
   return provider;
 }
 
-// 24x24 purple square SVG, base64-encoded. Reown's modal requires a non-empty
-// icon URL or the wallet entry is dropped silently.
-const PROVIDER_ICON_DATA_URL =
+function wrapHostProvider(host: Record<string | symbol, unknown>): unknown {
+  // Reuse if already wrapped (idempotent re-claim).
+  if ((host as { [WRAPPED_MARKER]?: boolean })[WRAPPED_MARKER]) return host;
+
+  return new Proxy(host, {
+    get(target, prop) {
+      if (prop === WRAPPED_MARKER) return true;
+      if (prop === "isAutoEvoEvo") return true;
+      if (prop === "request") {
+        const original = target["request"] as (args: {
+          method: string;
+          params?: unknown[];
+        }) => Promise<unknown>;
+        return async (args: { method: string; params?: unknown[] }) => {
+          const params = args.params ?? [];
+          if (args.method === "eth_sendTransaction") {
+            return backgroundRequest(args.method, params);
+          }
+          return original.call(target, { method: args.method, params });
+        };
+      }
+      return Reflect.get(target, prop, target);
+    },
+  });
+}
+
+function ensureProvider(standalone: EIP1193Provider): void {
+  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
+  if (eth && (eth as { [WRAPPED_MARKER]?: boolean })[WRAPPED_MARKER]) return;
+
+  if (eth) {
+    // Foreign wallet is present. Wrap it.
+    (window as unknown as { ethereum: unknown }).ethereum = wrapHostProvider(
+      eth as Record<string | symbol, unknown>,
+    );
+    return;
+  }
+  // Nothing injected. Install our standalone provider.
+  (window as unknown as { ethereum: unknown }).ethereum = standalone;
+}
+
+const ICON_DATA_URL =
   "data:image/svg+xml;base64," +
   btoa(
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
@@ -103,3 +140,40 @@ const PROVIDER_ICON_DATA_URL =
       '<text x="12" y="16" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="#0b0e14">AE</text>' +
       "</svg>",
   );
+
+const ANNOUNCE_DETAIL = (provider: EIP1193Provider) =>
+  Object.freeze({
+    info: {
+      uuid: "auto-evoevo-0001-0000-0000-000000000001",
+      name: "Auto EvoEvo",
+      rdns: "ai.evoevo.auto",
+      icon: ICON_DATA_URL,
+    },
+    provider,
+  });
+
+export function installProvider(): EIP1193Provider {
+  installMessageBridge();
+
+  const standalone = makeStandaloneProvider();
+  ensureProvider(standalone);
+
+  // Re-claim periodically so a late-injecting wallet (e.g. Rabby) gets
+  // wrapped instead of replacing us.
+  setInterval(() => ensureProvider(standalone), 200);
+
+  // EIP-6963 announce + respond. Picker that supports it will see us as
+  // a discrete wallet; pickers that ignore EIP-6963 still find us via
+  // isMetaMask spoof on the standalone provider OR via the proxy
+  // wrapping window.ethereum (which Reown's MetaMask entry resolves to).
+  const detail = ANNOUNCE_DETAIL(standalone);
+  const announce = (): void => {
+    window.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", { detail }),
+    );
+  };
+  window.addEventListener("eip6963:requestProvider", announce);
+  announce();
+
+  return standalone;
+}
