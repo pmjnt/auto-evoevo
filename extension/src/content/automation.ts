@@ -4,6 +4,8 @@ const DEFAULT_OUTCOME_TIMEOUT_MS = 10_000;
 const DEFAULT_EMPTY_FEED_TIMEOUT_MS = 30_000;
 const DEFAULT_MODAL_REFRESH_DELAY_MS = 2_000;
 const DOM_POLL_MS = 250;
+const CONTROL_SELECTOR =
+  "button,[role='button'],a,input[type='button'],input[type='submit'],[tabindex]";
 
 export type AutomationEvent =
   | { type: "started" }
@@ -146,9 +148,8 @@ async function waitForFeedControls(timeoutMs: number): Promise<boolean> {
 }
 
 function hasFeedControls(): boolean {
-  const buttons = Array.from(document.querySelectorAll("button"));
-  return buttons.some((button) =>
-    /add to memory|show more/i.test(button.textContent ?? ""),
+  return controlElements().some((control) =>
+    /add to memory|show more/i.test(controlText(control)),
   );
 }
 
@@ -182,48 +183,65 @@ function isVisibleElement(element: Element): boolean {
 }
 
 function nextMemoryButton(): HTMLElement | null {
-  const buttons = Array.from(document.querySelectorAll("button"));
-  for (const button of buttons) {
-    if (!/add to memory/i.test(button.textContent ?? "")) continue;
-    if (button.hasAttribute(MARKER)) continue;
-    if (!isVisibleEnabled(button)) continue;
-    return button;
+  for (const control of controlElements()) {
+    if (!/add to memory/i.test(controlText(control))) continue;
+    if (control.hasAttribute(MARKER)) continue;
+    if (!isVisibleEnabled(control)) continue;
+    return control;
   }
   return null;
 }
 
 async function tryShowMore(): Promise<boolean> {
-  const buttons = Array.from(document.querySelectorAll("button"));
-  const showMore = buttons.find((b) => /show more/i.test(b.textContent ?? ""));
+  const showMore = controlElements().find((control) =>
+    /show more/i.test(controlText(control)),
+  );
   if (!showMore || !isVisibleEnabled(showMore)) return false;
-  const before = countMemoryButtons();
+  const before = countMemoryControls();
   showMore.click();
   await new Promise((r) => setTimeout(r, 0));
-  return countMemoryButtons() > before;
+  return countMemoryControls() > before;
 }
 
-function countMemoryButtons(): number {
-  return Array.from(document.querySelectorAll("button")).filter((b) =>
-    /add to memory/i.test(b.textContent ?? ""),
+function countMemoryControls(): number {
+  return controlElements().filter((control) =>
+    /add to memory/i.test(controlText(control)),
   ).length;
 }
 
 function isVisibleEnabled(el: HTMLElement): boolean {
   if (el.hasAttribute("disabled")) return false;
+  if (el.getAttribute("aria-disabled") === "true") return false;
   // happy-dom does not implement layout, so treat as visible if attached
   return el.isConnected;
 }
 
 function shouldStopForBuffer(threshold: number): boolean {
-  const unmarked = Array.from(document.querySelectorAll("button")).filter(
-    (button) =>
-      /add to memory/i.test(button.textContent ?? "") &&
-      !button.hasAttribute(MARKER) &&
-      isVisibleEnabled(button),
+  const unmarked = controlElements().filter(
+    (control) =>
+      /add to memory/i.test(controlText(control)) &&
+      !control.hasAttribute(MARKER) &&
+      isVisibleEnabled(control),
   ).length;
-  const canExpand = Array.from(document.querySelectorAll("button")).some(
-    (button) =>
-      /show more/i.test(button.textContent ?? "") && isVisibleEnabled(button),
+  const canExpand = controlElements().some(
+    (control) =>
+      /show more/i.test(controlText(control)) && isVisibleEnabled(control),
   );
   return unmarked <= threshold && !canExpand;
+}
+
+function controlElements(): HTMLElement[] {
+  const seen = new Set<HTMLElement>();
+  const controls: HTMLElement[] = [];
+  for (const element of Array.from(document.querySelectorAll(CONTROL_SELECTOR))) {
+    if (!(element instanceof HTMLElement)) continue;
+    if (seen.has(element)) continue;
+    seen.add(element);
+    controls.push(element);
+  }
+  return controls;
+}
+
+function controlText(element: HTMLElement): string {
+  return (element.textContent ?? "").replace(/\s+/g, " ").trim();
 }

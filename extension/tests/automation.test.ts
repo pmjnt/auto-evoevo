@@ -175,6 +175,47 @@ describe("automation loop", () => {
     expect(unmarked).toHaveLength(1);
   });
 
+  it("does not stop at the buffer when show more is a non-button control", async () => {
+    buildFeedDom(1);
+    const showMore = document.createElement("div");
+    showMore.setAttribute("role", "button");
+    showMore.textContent = "SHOW MORE";
+    showMore.addEventListener("click", () => {
+      showMore.remove();
+      const article = document.createElement("article");
+      const button = document.createElement("button");
+      button.textContent = "ADD TO MEMORY";
+      article.append(button);
+      document.body.append(article);
+    });
+    document.body.append(showMore);
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+
+    await runAutomation({
+      nextOutcome,
+      stopAtRemaining: 1,
+      onEvent: () => undefined,
+    });
+
+    expect(nextOutcome).toHaveBeenCalledTimes(1);
+  });
+
+  it("clicks add-to-memory controls rendered without a button tag", async () => {
+    const control = document.createElement("div");
+    control.setAttribute("role", "button");
+    control.textContent = "ADD TO MEMORY";
+    document.body.append(control);
+    const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
+
+    await runAutomation({
+      nextOutcome,
+      onEvent: () => undefined,
+    });
+
+    expect(nextOutcome).toHaveBeenCalledTimes(1);
+    expect(control.hasAttribute("data-auto-evoevo-attempted-id")).toBe(true);
+  });
+
   it("does not wait on a hidden retained submitting modal", async () => {
     vi.useFakeTimers();
     buildFeedDom(2);
