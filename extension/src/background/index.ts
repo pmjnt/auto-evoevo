@@ -86,17 +86,15 @@ export async function handleMessage(
 
     case "resume": {
       paused = false;
-      const tabsNotified = await broadcastStartToEvoEvoTabs(
-        await currentCooldownMs(),
-      );
+      const settings = await currentAutomationSettings();
+      const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
       return { ok: true, tabsNotified };
     }
 
     case "start": {
       paused = false;
-      const tabsNotified = await broadcastStartToEvoEvoTabs(
-        await currentCooldownMs(),
-      );
+      const settings = await currentAutomationSettings();
+      const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
       return { ok: true, tabsNotified };
     }
 
@@ -228,13 +226,24 @@ function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
   }
 }
 
-async function broadcastStartToEvoEvoTabs(cooldownMs: number): Promise<number> {
-  return await broadcastToEvoEvoTabs({ type: "start-automation", cooldownMs });
+type AutomationSettings = { cooldownMs: number; stopAtRemaining: number };
+
+async function broadcastStartToEvoEvoTabs(
+  settings: AutomationSettings,
+): Promise<number> {
+  return await broadcastToEvoEvoTabs({
+    type: "start-automation",
+    cooldownMs: settings.cooldownMs,
+    stopAtRemaining: settings.stopAtRemaining,
+  });
 }
 
-async function currentCooldownMs(): Promise<number> {
+async function currentAutomationSettings(): Promise<AutomationSettings> {
   const config = await getConfig();
-  return Math.max(0, (config?.cooldownSeconds ?? 0) * 1000);
+  return {
+    cooldownMs: Math.max(0, (config?.cooldownSeconds ?? 0) * 1000),
+    stopAtRemaining: Math.max(0, config?.stopAtRemaining ?? 0),
+  };
 }
 
 async function broadcastWalletEventToEvoEvoTabs(
@@ -265,4 +274,15 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     handleMessage(message, sender).then(sendResponse);
     return true;
   });
+}
+
+// Make the action icon open the side panel instead of a popup. The
+// panel persists across tab switches, so the user can watch automation
+// status while doing other things in another tab.
+if (typeof chrome !== "undefined" && chrome.sidePanel?.setPanelBehavior) {
+  void chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch(() => {
+      // Older Chromes may not support the API; ignore.
+    });
 }

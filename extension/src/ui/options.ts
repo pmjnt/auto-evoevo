@@ -12,6 +12,7 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   dryRun: true,
   idleLockMinutes: 30,
   cooldownSeconds: 3,
+  stopAtRemaining: 10,
 };
 
 function value(id: string): string {
@@ -44,6 +45,7 @@ function fillConfig(config: ExtensionConfig): void {
   setValue("allowedFunctionSelectors", config.allowedFunctionSelectors.join(", "));
   setValue("idleLockMinutes", config.idleLockMinutes);
   setValue("cooldownSeconds", config.cooldownSeconds);
+  setValue("stopAtRemaining", config.stopAtRemaining);
   setChecked("dryRun", config.dryRun);
 }
 
@@ -74,6 +76,7 @@ document.getElementById("save")?.addEventListener("click", async () => {
     dryRun: dryRunEl?.checked ?? true,
     idleLockMinutes: Number(value("idleLockMinutes")) || 30,
     cooldownSeconds: Math.max(0, Math.min(300, Number(value("cooldownSeconds")) || 0)),
+    stopAtRemaining: Math.max(0, Math.min(1000, Number(value("stopAtRemaining")) || 0)),
   };
 
   const setConfig = await send({ type: "set-config", config });

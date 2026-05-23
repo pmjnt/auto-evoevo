@@ -51,6 +51,7 @@ export const setConfigSchema = z.object({
     dryRun: z.boolean(),
     idleLockMinutes: z.number().int().positive(),
     cooldownSeconds: z.number().int().min(0).max(300).default(0),
+    stopAtRemaining: z.number().int().min(0).max(1000).default(10),
   }),
 });
 

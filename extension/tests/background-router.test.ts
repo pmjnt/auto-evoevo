@@ -21,6 +21,7 @@ describe("background router", () => {
       dryRun: true,
       idleLockMinutes: 30,
       cooldownSeconds: 0,
+      stopAtRemaining: 0,
     });
     // Reset module-level wallet state
     await handleMessage({ type: "lock" }, {} as chrome.runtime.MessageSender);

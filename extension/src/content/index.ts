@@ -56,6 +56,7 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
     event?: string;
     value?: unknown;
     cooldownMs?: number;
+    stopAtRemaining?: number;
   };
   if (value?.type === "start-automation") {
     if (automationRunning) return;
@@ -64,9 +65,14 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
       typeof value.cooldownMs === "number" && value.cooldownMs >= 0
         ? value.cooldownMs
         : 0;
+    const stopAtRemaining =
+      typeof value.stopAtRemaining === "number" && value.stopAtRemaining >= 0
+        ? value.stopAtRemaining
+        : 0;
     void runAutomation({
       nextOutcome,
       cooldownMs,
+      stopAtRemaining,
       onEvent: (event) => chrome.runtime.sendMessage({ type: "automation-event", event }),
     }).finally(() => {
       automationRunning = false;

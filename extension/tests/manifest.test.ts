@@ -18,11 +18,15 @@ describe("manifest.json", () => {
     expect(inpageEntry.world).toBe("MAIN");
     expect(inpageEntry.run_at).toBe("document_start");
     expect(manifest.background.service_worker).toBe("background.js");
-    expect(manifest.action.default_popup).toBe("popup.html");
+    // Action no longer has a popup — clicking the icon opens the side panel.
+    expect(manifest.action.default_popup).toBeUndefined();
+    expect(manifest.side_panel.default_path).toBe("popup.html");
     expect(manifest.action.default_icon["128"]).toBe("icons/icon-128.png");
     expect(manifest.icons["128"]).toBe("icons/icon-128.png");
     expect(manifest.options_page).toBe("options.html");
     expect(manifest.web_accessible_resources[0].resources).toContain("inpage.js");
-    expect(manifest.permissions).toEqual(expect.arrayContaining(["storage", "scripting"]));
+    expect(manifest.permissions).toEqual(
+      expect.arrayContaining(["storage", "scripting", "sidePanel"]),
+    );
   });
 });
