@@ -77,6 +77,9 @@ export async function handleMessage(
       };
     }
 
+    case "get-config":
+      return { ok: true, config: await getConfig() };
+
     case "pause":
       paused = true;
       return { ok: true };

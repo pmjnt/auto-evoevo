@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, rmSync } from "node:fs";
 
 // Avoid rmSync when Chrome has the unpacked extension loaded — it keeps
 // files open and the recursive delete fails. Overwrite-in-place is safe
@@ -26,5 +26,6 @@ await Promise.all([
 copyFileSync("src/ui/popup.html", "dist/popup.html");
 copyFileSync("src/ui/options.html", "dist/options.html");
 copyFileSync("manifest.json", "dist/manifest.json");
+cpSync("src/assets/icons", "dist/icons", { recursive: true });
 
 console.log("Built dist/");

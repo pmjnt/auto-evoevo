@@ -40,6 +40,23 @@ describe("background router", () => {
     expect((response as any).counts).toBeDefined();
   });
 
+  it("routes get-config with the stored extension config", async () => {
+    const response = await handleMessage({ type: "get-config" }, {} as chrome.runtime.MessageSender);
+    expect(response).toMatchObject({
+      ok: true,
+      config: {
+        allowedOrigin: "https://evoevo.ai",
+        allowedChain: "0G",
+        chainId: 16661,
+        rpcUrl: "https://rpc.example",
+        maxFeeNative: 0.001,
+        dryRun: true,
+        idleLockMinutes: 30,
+        cooldownSeconds: 0,
+      },
+    });
+  });
+
   it("rejects unsupported write method", async () => {
     const response = await handleMessage(
       { type: "rpc-request", id: "1", method: "personal_sign", params: ["0xdata", "0xaddr"] },

@@ -17,6 +17,11 @@ describe("messages schema", () => {
     expect(parsed.type).toBe("unlock");
   });
 
+  it("parses a valid get-config request", () => {
+    const parsed = parseMessage({ type: "get-config" });
+    expect(parsed.type).toBe("get-config");
+  });
+
   it("rejects an unknown type", () => {
     expect(() => parseMessage({ type: "bogus" })).toThrow();
   });
