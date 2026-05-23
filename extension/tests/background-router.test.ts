@@ -128,4 +128,19 @@ describe("background router", () => {
       automationTab: { state: "closed", id: tabId },
     });
   });
+
+  it("updates paused status from automation paused events", async () => {
+    await handleMessage({ type: "resume" }, {} as chrome.runtime.MessageSender);
+
+    await handleMessage(
+      { type: "automation-event", event: { type: "paused", reason: "Timed out waiting for transaction after click" } },
+      {} as chrome.runtime.MessageSender,
+    );
+
+    const status = await handleMessage(
+      { type: "get-status" },
+      {} as chrome.runtime.MessageSender,
+    );
+    expect(status).toMatchObject({ ok: true, paused: true });
+  });
 });

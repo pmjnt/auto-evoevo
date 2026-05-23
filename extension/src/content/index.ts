@@ -12,10 +12,22 @@ function pushOutcome(outcome: Outcome): void {
   else outcomeQueue.push(outcome);
 }
 
-function nextOutcome(): Promise<Outcome> {
+function nextOutcome(signal: AbortSignal): Promise<Outcome> {
   const buffered = outcomeQueue.shift();
   if (buffered) return Promise.resolve(buffered);
-  return new Promise((resolve) => outcomeWaiters.push(resolve));
+  return new Promise((resolve) => {
+    const waiter = (value: Outcome): void => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(value);
+    };
+    const onAbort = (): void => {
+      const index = outcomeWaiters.indexOf(waiter);
+      if (index >= 0) outcomeWaiters.splice(index, 1);
+    };
+    if (signal.aborted) return;
+    signal.addEventListener("abort", onAbort, { once: true });
+    outcomeWaiters.push(waiter);
+  });
 }
 
 // inpage.js is injected by manifest content_scripts with world:"MAIN"

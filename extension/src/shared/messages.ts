@@ -32,6 +32,15 @@ export const resumeSchema = z.object({ type: z.literal("resume") });
 export const startSchema = z.object({ type: z.literal("start") });
 export const startDedicatedSchema = z.object({ type: z.literal("start-dedicated") });
 export const stopSchema = z.object({ type: z.literal("stop") });
+export const automationEventSchema = z.object({
+  type: z.literal("automation-event"),
+  event: z.object({
+    type: z.string().min(1),
+    reason: z.string().optional(),
+    txHash: z.string().optional(),
+    index: z.number().int().optional(),
+  }),
+});
 
 export const importKeySchema = z.object({
   type: z.literal("import-key"),
@@ -70,6 +79,7 @@ export const messageSchema = z.discriminatedUnion("type", [
   startSchema,
   startDedicatedSchema,
   stopSchema,
+  automationEventSchema,
   importKeySchema,
   setConfigSchema,
   exportLogSchema,

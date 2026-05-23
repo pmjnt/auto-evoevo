@@ -1,5 +1,6 @@
 const MARKER = "data-auto-evoevo-attempted-id";
 const IDLE_LIMIT = 2;
+const DEFAULT_OUTCOME_TIMEOUT_MS = 10_000;
 
 export type AutomationEvent =
   | { type: "started" }
@@ -13,9 +14,10 @@ export type Outcome =
   | { ok: false; error: { code: number; message: string } };
 
 export type AutomationDeps = {
-  nextOutcome: () => Promise<Outcome>;
+  nextOutcome: (signal: AbortSignal) => Promise<Outcome>;
   onEvent: (event: AutomationEvent) => void;
   cooldownMs?: number;
+  outcomeTimeoutMs?: number;
   // Stop when the count of unmarked ADD TO MEMORY buttons drops to this
   // number AND no SHOW MORE button is available. Acts as a buffer so we
   // don't drain the feed when we can't refill.
@@ -29,6 +31,10 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
   deps.onEvent({ type: "started" });
   const cooldownMs = Math.max(0, deps.cooldownMs ?? 0);
   const stopAtRemaining = Math.max(0, deps.stopAtRemaining ?? 0);
+  const outcomeTimeoutMs = Math.max(
+    1,
+    deps.outcomeTimeoutMs ?? DEFAULT_OUTCOME_TIMEOUT_MS,
+  );
   let attemptId = 0;
   let idleExpansions = 0;
   let index = 0;
@@ -52,7 +58,7 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
     index += 1;
     button.click();
 
-    const outcome = await deps.nextOutcome();
+    const outcome = await waitForOutcome(deps.nextOutcome, outcomeTimeoutMs);
 
     if (outcome.ok) {
       deps.onEvent({ type: "approved", txHash: outcome.txHash });
@@ -69,6 +75,41 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
   }
 
   deps.onEvent({ type: "done" });
+}
+
+async function waitForOutcome(
+  nextOutcome: AutomationDeps["nextOutcome"],
+  timeoutMs: number,
+): Promise<Outcome> {
+  const controller = new AbortController();
+  return await new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      controller.abort();
+      resolve({
+        ok: false,
+        error: {
+          code: 408,
+          message: "Timed out waiting for transaction after click",
+        },
+      });
+    }, timeoutMs);
+
+    nextOutcome(controller.signal)
+      .then((outcome) => {
+        clearTimeout(timeout);
+        resolve(outcome);
+      })
+      .catch((error) => {
+        clearTimeout(timeout);
+        resolve({
+          ok: false,
+          error: {
+            code: 4001,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
+      });
+  });
 }
 
 function nextMemoryButton(): HTMLElement | null {

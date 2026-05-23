@@ -124,6 +124,13 @@ export async function handleMessage(
       paused = true;
       return { ok: true };
 
+    case "automation-event":
+      if (message.event.type === "started") paused = false;
+      if (message.event.type === "paused" || message.event.type === "done") {
+        paused = true;
+      }
+      return { ok: true };
+
     case "set-config":
       await persistConfig(message.config);
       return { ok: true };
