@@ -16,6 +16,10 @@ export type AutomationDeps = {
   nextOutcome: () => Promise<Outcome>;
   onEvent: (event: AutomationEvent) => void;
   cooldownMs?: number;
+  // Stop when the count of unmarked ADD TO MEMORY buttons drops to this
+  // number AND no SHOW MORE button is available. Acts as a buffer so we
+  // don't drain the feed when we can't refill.
+  stopAtRemaining?: number;
 };
 
 const sleep = (ms: number): Promise<void> =>
@@ -24,11 +28,16 @@ const sleep = (ms: number): Promise<void> =>
 export async function runAutomation(deps: AutomationDeps): Promise<void> {
   deps.onEvent({ type: "started" });
   const cooldownMs = Math.max(0, deps.cooldownMs ?? 0);
+  const stopAtRemaining = Math.max(0, deps.stopAtRemaining ?? 0);
   let attemptId = 0;
   let idleExpansions = 0;
   let index = 0;
 
   while (idleExpansions < IDLE_LIMIT) {
+    if (stopAtRemaining > 0 && shouldStopForBuffer(stopAtRemaining)) {
+      break;
+    }
+
     const button = nextMemoryButton();
     if (button === null) {
       const expanded = await tryShowMore();
@@ -93,4 +102,18 @@ function isVisibleEnabled(el: HTMLElement): boolean {
   if (el.hasAttribute("disabled")) return false;
   // happy-dom does not implement layout, so treat as visible if attached
   return el.isConnected;
+}
+
+function shouldStopForBuffer(threshold: number): boolean {
+  const unmarked = Array.from(document.querySelectorAll("button")).filter(
+    (button) =>
+      /add to memory/i.test(button.textContent ?? "") &&
+      !button.hasAttribute(MARKER) &&
+      isVisibleEnabled(button),
+  ).length;
+  const canExpand = Array.from(document.querySelectorAll("button")).some(
+    (button) =>
+      /show more/i.test(button.textContent ?? "") && isVisibleEnabled(button),
+  );
+  return unmarked <= threshold && !canExpand;
 }

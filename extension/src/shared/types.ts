@@ -27,6 +27,9 @@ export type ExtensionConfig = {
   dryRun: boolean;
   idleLockMinutes: number;
   cooldownSeconds: number;
+  // Stop automation when fewer than this many unprocessed ADD TO MEMORY
+  // buttons remain visible AND there is no SHOW MORE button to load more.
+  stopAtRemaining: number;
 };
 
 export type AttemptStatus =

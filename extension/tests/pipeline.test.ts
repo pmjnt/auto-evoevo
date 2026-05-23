@@ -14,6 +14,7 @@ const config: ExtensionConfig = {
   dryRun: false,
   idleLockMinutes: 30,
   cooldownSeconds: 0,
+  stopAtRemaining: 0,
 };
 
 function makeDeps(overrides: Record<string, unknown> = {}) {

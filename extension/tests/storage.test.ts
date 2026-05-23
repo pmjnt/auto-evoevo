@@ -22,6 +22,7 @@ const fakeConfig: ExtensionConfig = {
   dryRun: true,
   idleLockMinutes: 30,
   cooldownSeconds: 0,
+  stopAtRemaining: 0,
 };
 
 describe("storage", () => {
