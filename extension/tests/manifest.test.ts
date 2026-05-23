@@ -10,6 +10,13 @@ describe("manifest.json", () => {
     expect(manifest.content_scripts).toBeDefined();
     expect(manifest.content_scripts[0].matches).toEqual(["https://evoevo.ai/*"]);
     expect(manifest.content_scripts[0].run_at).toBe("document_start");
+    // inpage runs in MAIN world so the page sees the provider directly.
+    const inpageEntry = manifest.content_scripts.find((entry: { js: string[]; world?: string }) =>
+      entry.js.includes("inpage.js"),
+    );
+    expect(inpageEntry).toBeDefined();
+    expect(inpageEntry.world).toBe("MAIN");
+    expect(inpageEntry.run_at).toBe("document_start");
     expect(manifest.background.service_worker).toBe("background.js");
     expect(manifest.action.default_popup).toBe("popup.html");
     expect(manifest.options_page).toBe("options.html");

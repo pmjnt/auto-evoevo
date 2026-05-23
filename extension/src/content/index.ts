@@ -18,13 +18,9 @@ function nextOutcome(): Promise<Outcome> {
   return new Promise((resolve) => outcomeWaiters.push(resolve));
 }
 
-function injectInpage(): void {
-  const script = document.createElement("script");
-  script.src = chrome.runtime.getURL("inpage.js");
-  script.async = false;
-  (document.head ?? document.documentElement).appendChild(script);
-  script.remove();
-}
+// inpage.js is injected by manifest content_scripts with world:"MAIN"
+// (see manifest.json), so we don't need to inject a <script src> here.
+// That older approach was blocked by evoevo.ai's CSP.
 
 window.addEventListener("message", (event: MessageEvent) => {
   const data = event.data;
@@ -80,5 +76,3 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
     );
   }
 });
-
-injectInpage();
