@@ -23,6 +23,12 @@ export type PipelineDeps = {
   rpc: {
     getTransactionCount: (address: string, tag: "pending") => Promise<number>;
     gasPrice: () => Promise<bigint>;
+    estimateGas: (tx: {
+      to: string;
+      data: string;
+      value?: string;
+      from?: string;
+    }) => Promise<bigint>;
     sendRawTransaction: (signed: string) => Promise<string>;
     sendRawTransactionWithNonceRetry: (
       signed: string,
@@ -88,7 +94,40 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
 
   const nonce = await input.rpc.getTransactionCount(input.wallet.address, "pending");
   const gasPrice = await input.rpc.gasPrice();
-  const estimatedFeeNative = Number(FALLBACK_GAS_LIMIT * gasPrice) / 1e18;
+
+  // Estimate gas. Hardcoded fallback (200k) used to underflow EvoEvo's
+  // ADD TO MEMORY which actually consumes more, causing the RPC node to
+  // reject the tx pre-broadcast as "out of gas" during simulation.
+  const pageGas =
+    typeof raw.gas === "string"
+      ? ((): bigint | null => {
+          try {
+            return BigInt(raw.gas as string);
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+  let gasLimit: bigint;
+  try {
+    const estimated = await input.rpc.estimateGas({
+      to: to ?? "0x",
+      data: dataHex,
+      value: valueHex,
+      from: input.wallet.address,
+    });
+    // 20% buffer.
+    const buffered = (estimated * 12n) / 10n;
+    gasLimit = pageGas !== null && pageGas > buffered ? pageGas : buffered;
+  } catch {
+    // Estimate RPC failed (network / not supported). Fall back to the
+    // page-provided gas if any, otherwise a generous 2x of the old
+    // hardcoded floor so we don't immediately starve.
+    gasLimit = pageGas ?? FALLBACK_GAS_LIMIT * 2n;
+  }
+
+  const estimatedFeeNative = Number(gasLimit * gasPrice) / 1e18;
 
   const walletRequest: WalletRequest = {
     origin: input.senderOrigin,
@@ -118,7 +157,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
     data: dataHex,
     value,
     nonce,
-    gasLimit: FALLBACK_GAS_LIMIT,
+    gasLimit,
     gasPrice,
     chainId: input.config.chainId,
   });
@@ -137,7 +176,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
         data: dataHex,
         value,
         nonce: err.refetchedNonce,
-        gasLimit: FALLBACK_GAS_LIMIT,
+        gasLimit,
         gasPrice,
         chainId: input.config.chainId,
       });
