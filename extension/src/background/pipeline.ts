@@ -34,6 +34,9 @@ export type PipelineDeps = {
       signed: string,
       fromAddress: string,
     ) => Promise<{ txHash: string; refetchedNonce: number | null }>;
+    waitForReceipt: (
+      hash: string,
+    ) => Promise<{ status: "success" | "reverted" } | "timeout">;
   };
   log: { append: (entry: AttemptLog) => Promise<void> };
 };
@@ -186,6 +189,46 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineResult>
       );
       result = { txHash: retryTxHash, refetchedNonce: err.refetchedNonce };
     }
+    // Wait for on-chain confirmation before declaring success. Avoids
+    // racing with EvoEvo's UI, which shows a "Submitting on-chain..."
+    // modal once the network mempool starts backing up. The automation
+    // loop won't click the next button until the receipt arrives.
+    const receipt = await input.rpc.waitForReceipt(result.txHash);
+
+    if (receipt === "timeout") {
+      await input.log.append(
+        makeLog({
+          status: "rpc_failed",
+          reason: `Receipt timeout for ${result.txHash}`,
+          walletRequest,
+          decision,
+          txHash: result.txHash,
+        }),
+      );
+      return {
+        ok: false,
+        errorCode: 4001,
+        reason: `Receipt timeout for ${result.txHash}`,
+      };
+    }
+
+    if (receipt.status === "reverted") {
+      await input.log.append(
+        makeLog({
+          status: "reverted",
+          reason: "Transaction reverted on-chain",
+          walletRequest,
+          decision,
+          txHash: result.txHash,
+        }),
+      );
+      return {
+        ok: false,
+        errorCode: 4001,
+        reason: `Transaction reverted on-chain: ${result.txHash}`,
+      };
+    }
+
     await input.log.append(
       makeLog({ status: "signed", reason: decision.reason, walletRequest, decision, txHash: result.txHash }),
     );
