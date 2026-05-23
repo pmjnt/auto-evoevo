@@ -15,8 +15,9 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   stopAtRemaining: 10,
 };
 
-function value(id: string): string {
-  return (document.getElementById(id) as HTMLInputElement).value.trim();
+function value(id: string, fallback = ""): string {
+  const el = document.getElementById(id) as HTMLInputElement | null;
+  return el?.value.trim() ?? fallback;
 }
 
 function setValue(id: string, value: string | number): void {
@@ -74,7 +75,7 @@ document.getElementById("save")?.addEventListener("click", async () => {
     allowedFunctionSelectors: value("allowedFunctionSelectors").split(",").map((s) => s.trim()).filter(Boolean),
     maxFeeNative: Number(value("maxFeeNative")),
     dryRun: dryRunEl?.checked ?? true,
-    idleLockMinutes: Number(value("idleLockMinutes")) || 30,
+    idleLockMinutes: Number(value("idleLockMinutes", "30")) || 30,
     cooldownSeconds: Math.max(0, Math.min(300, Number(value("cooldownSeconds")) || 0)),
     stopAtRemaining: Math.max(0, Math.min(1000, Number(value("stopAtRemaining")) || 0)),
   };

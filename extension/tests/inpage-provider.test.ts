@@ -1,8 +1,29 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { installProvider, type EIP1193Provider } from "../src/inpage/provider.js";
 
 describe("inpage provider", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+  });
+
+  it("does not throw when window.ethereum is a getter-only property", () => {
+    const host = {
+      request: vi.fn(async () => "0x41"),
+    };
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      get: () => host,
+    });
+
+    expect(() => installProvider()).not.toThrow();
+    expect((window as unknown as { ethereum?: EIP1193Provider }).ethereum?.isAutoEvoEvo).toBe(true);
+  });
+
   it("posts an rpc message and resolves on matching response", async () => {
     const provider: EIP1193Provider = installProvider();
     const requestPromise = provider.request({ method: "eth_chainId" });

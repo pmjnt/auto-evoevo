@@ -117,19 +117,35 @@ function wrapHostProvider(host: Record<string | symbol, unknown>): unknown {
   });
 }
 
+function setWindowEthereum(provider: unknown): boolean {
+  try {
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      writable: true,
+      value: provider,
+    });
+    return true;
+  } catch {
+    try {
+      (window as unknown as { ethereum: unknown }).ethereum = provider;
+      return (window as unknown as { ethereum?: unknown }).ethereum === provider;
+    } catch {
+      return false;
+    }
+  }
+}
+
 function ensureProvider(standalone: EIP1193Provider): void {
   const eth = (window as unknown as { ethereum?: unknown }).ethereum;
   if (eth && (eth as { [WRAPPED_MARKER]?: boolean })[WRAPPED_MARKER]) return;
 
   if (eth) {
     // Foreign wallet is present. Wrap it.
-    (window as unknown as { ethereum: unknown }).ethereum = wrapHostProvider(
-      eth as Record<string | symbol, unknown>,
-    );
+    setWindowEthereum(wrapHostProvider(eth as Record<string | symbol, unknown>));
     return;
   }
   // Nothing injected. Install our standalone provider.
-  (window as unknown as { ethereum: unknown }).ethereum = standalone;
+  setWindowEthereum(standalone);
 }
 
 const ICON_DATA_URL =

@@ -276,9 +276,15 @@
           </div>
         </div>
         <div style="height:10px"></div>
-        <div class="field">
-          <label class="field-label" for="stopAtRemaining"><span>Stop at remaining items</span><span class="hint">0 = run to exhaustion</span></label>
-          <input id="stopAtRemaining" type="number" min="0" max="1000" value="10" />
+        <div class="row">
+          <div class="field">
+            <label class="field-label" for="stopAtRemaining"><span>Stop at remaining items</span><span class="hint">0 = run to exhaustion</span></label>
+            <input id="stopAtRemaining" type="number" min="0" max="1000" value="10" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="idleLockMinutes"><span>Idle lock minutes</span><span class="hint">auto-lock</span></label>
+            <input id="idleLockMinutes" type="number" min="1" value="30" />
+          </div>
         </div>
         <div style="height:10px"></div>
         <div class="field">
