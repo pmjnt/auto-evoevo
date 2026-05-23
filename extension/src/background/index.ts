@@ -8,6 +8,12 @@ import { runPipeline } from "./pipeline.js";
 const wallet = new Wallet();
 const log = new SessionLog();
 let paused = false;
+let automationTabId: number | null = null;
+let closedAutomationTabId: number | null = null;
+let tabLifecycleListenerInstalled = false;
+let tabLifecycleSource: typeof chrome.tabs | null = null;
+
+const EVOEVO_TAB_URL = "https://evoevo.ai/feed?chainId=16661";
 
 const READ_ONLY_METHODS = new Set([
   "eth_blockNumber",
@@ -42,6 +48,8 @@ export async function handleMessage(
   raw: unknown,
   sender: chrome.runtime.MessageSender,
 ): Promise<RouterResponse> {
+  installTabLifecycleListener();
+
   let message;
   try {
     message = parseMessage(raw);
@@ -74,6 +82,7 @@ export async function handleMessage(
         address: wallet.address,
         paused,
         counts: await log.counts(),
+        automationTab: automationTabStatus(),
       };
     }
 
@@ -96,6 +105,19 @@ export async function handleMessage(
       const settings = await currentAutomationSettings();
       const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
       return { ok: true, tabsNotified };
+    }
+
+    case "start-dedicated": {
+      paused = false;
+      const settings = await currentAutomationSettings();
+      const target = await resolveAutomationTab();
+      const tabsNotified = await sendStartToTab(target.tabId, settings);
+      return {
+        ok: true,
+        tabId: target.tabId,
+        created: target.created,
+        tabsNotified,
+      };
     }
 
     case "stop":
@@ -228,6 +250,17 @@ function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
 
 type AutomationSettings = { cooldownMs: number; stopAtRemaining: number };
 
+type AutomationTabStatus =
+  | { state: "none"; id: null }
+  | { state: "ready"; id: number }
+  | { state: "closed"; id: number };
+
+function automationTabStatus(): AutomationTabStatus {
+  if (automationTabId !== null) return { state: "ready", id: automationTabId };
+  if (closedAutomationTabId !== null) return { state: "closed", id: closedAutomationTabId };
+  return { state: "none", id: null };
+}
+
 async function broadcastStartToEvoEvoTabs(
   settings: AutomationSettings,
 ): Promise<number> {
@@ -236,6 +269,50 @@ async function broadcastStartToEvoEvoTabs(
     cooldownMs: settings.cooldownMs,
     stopAtRemaining: settings.stopAtRemaining,
   });
+}
+
+async function sendStartToTab(
+  tabId: number,
+  settings: AutomationSettings,
+): Promise<number> {
+  if (typeof chrome === "undefined" || !chrome.tabs?.sendMessage) return 0;
+  try {
+    await chrome.tabs.sendMessage(tabId, {
+      type: "start-automation",
+      cooldownMs: settings.cooldownMs,
+      stopAtRemaining: settings.stopAtRemaining,
+    });
+    return 1;
+  } catch {
+    return 0;
+  }
+}
+
+async function resolveAutomationTab(): Promise<{ tabId: number; created: boolean }> {
+  if (typeof chrome === "undefined" || !chrome.tabs?.query || !chrome.tabs?.create) {
+    return { tabId: -1, created: false };
+  }
+
+  const evoevoTabs = await chrome.tabs.query({ url: "https://evoevo.ai/*" });
+  if (automationTabId !== null) {
+    const existing = evoevoTabs.find((tab) => tab.id === automationTabId);
+    if (existing?.id !== undefined) {
+      closedAutomationTabId = null;
+      return { tabId: existing.id, created: false };
+    }
+  }
+
+  const existing = evoevoTabs.find((tab) => tab.id !== undefined);
+  if (existing?.id !== undefined) {
+    automationTabId = existing.id;
+    closedAutomationTabId = null;
+    return { tabId: existing.id, created: false };
+  }
+
+  const created = await chrome.tabs.create({ url: EVOEVO_TAB_URL, active: false });
+  automationTabId = created.id ?? null;
+  closedAutomationTabId = null;
+  return { tabId: automationTabId ?? -1, created: true };
 }
 
 async function currentAutomationSettings(): Promise<AutomationSettings> {
@@ -275,6 +352,21 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     return true;
   });
 }
+
+function installTabLifecycleListener(): void {
+  if (typeof chrome === "undefined" || !chrome.tabs?.onRemoved) return;
+  if (tabLifecycleListenerInstalled && tabLifecycleSource === chrome.tabs) return;
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    if (tabId !== automationTabId) return;
+    closedAutomationTabId = tabId;
+    automationTabId = null;
+    paused = true;
+  });
+  tabLifecycleListenerInstalled = true;
+  tabLifecycleSource = chrome.tabs;
+}
+
+installTabLifecycleListener();
 
 // Make the action icon open the side panel instead of a popup. The
 // panel persists across tab switches, so the user can watch automation

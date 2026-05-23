@@ -113,6 +113,7 @@
       box-shadow: none;
     }
     .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+    .row.wrap { flex-wrap: wrap; }
     .stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -195,11 +196,13 @@
           <div class="stat"><span>Dry-run</span><strong id="dry">0</strong></div>
           <div class="stat"><span>Manual</span><strong id="manual">0</strong></div>
           <div class="stat"><span>Rejected</span><strong id="rejected">0</strong></div>
+          <div class="stat"><span>Auto tab</span><strong id="automation-tab">none</strong></div>
         </div>
-        <div class="row">
+        <div class="row wrap">
           <button id="lock" class="btn ghost">Lock</button>
           <button id="pause" class="btn ghost">Pause</button>
-          <button id="start" class="btn">Start</button>
+          <button id="start" class="btn ghost">Start all</button>
+          <button id="start-dedicated" class="btn">Start dedicated</button>
         </div>
         <div id="start-msg"></div>
       </section>

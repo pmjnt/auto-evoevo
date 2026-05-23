@@ -30,6 +30,7 @@ export const getConfigSchema = z.object({ type: z.literal("get-config") });
 export const pauseSchema = z.object({ type: z.literal("pause") });
 export const resumeSchema = z.object({ type: z.literal("resume") });
 export const startSchema = z.object({ type: z.literal("start") });
+export const startDedicatedSchema = z.object({ type: z.literal("start-dedicated") });
 export const stopSchema = z.object({ type: z.literal("stop") });
 
 export const importKeySchema = z.object({
@@ -67,6 +68,7 @@ export const messageSchema = z.discriminatedUnion("type", [
   pauseSchema,
   resumeSchema,
   startSchema,
+  startDedicatedSchema,
   stopSchema,
   importKeySchema,
   setConfigSchema,

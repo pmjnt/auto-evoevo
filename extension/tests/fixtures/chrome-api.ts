@@ -59,13 +59,93 @@ class FakeStorageArea {
   }
 }
 
+class FakeTabsApi {
+  private tabs: chrome.tabs.Tab[] = [];
+  private messages: Array<{ tabId: number; message: unknown }> = [];
+  private nextId = 1;
+  private removedListeners: Array<(tabId: number) => void> = [];
+
+  query = async (queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> => {
+    const urlPattern = typeof queryInfo.url === "string" ? queryInfo.url : null;
+    if (urlPattern === "https://evoevo.ai/*") {
+      return this.tabs.filter((tab) => tab.url?.startsWith("https://evoevo.ai/"));
+    }
+    return [...this.tabs];
+  };
+
+  create = async (createProperties: chrome.tabs.CreateProperties): Promise<chrome.tabs.Tab> => {
+    const tab: chrome.tabs.Tab = {
+      id: this.nextId,
+      index: this.tabs.length,
+      highlighted: false,
+      active: createProperties.active ?? false,
+      pinned: false,
+      incognito: false,
+      selected: false,
+      discarded: false,
+      autoDiscardable: true,
+      groupId: -1,
+      windowId: 1,
+      url: createProperties.url,
+    };
+    this.nextId += 1;
+    this.tabs.push(tab);
+    return tab;
+  };
+
+  sendMessage = async (tabId: number, message: unknown): Promise<void> => {
+    this.messages.push({ tabId, message });
+  };
+
+  onRemoved = {
+    addListener: (listener: (tabId: number) => void) => {
+      this.removedListeners.push(listener);
+    },
+    removeListener: (listener: (tabId: number) => void) => {
+      this.removedListeners = this.removedListeners.filter((item) => item !== listener);
+    },
+  };
+
+  _add(tab: Partial<chrome.tabs.Tab> & { id: number; url: string }): void {
+    this.tabs.push({
+      index: this.tabs.length,
+      highlighted: false,
+      active: false,
+      pinned: false,
+      incognito: false,
+      selected: false,
+      discarded: false,
+      autoDiscardable: true,
+      groupId: -1,
+      windowId: 1,
+      ...tab,
+    });
+    this.nextId = Math.max(this.nextId, tab.id + 1);
+  }
+
+  _messages(): Array<{ tabId: number; message: unknown }> {
+    return [...this.messages];
+  }
+
+  _tabs(): chrome.tabs.Tab[] {
+    return [...this.tabs];
+  }
+
+  _remove(tabId: number): void {
+    this.tabs = this.tabs.filter((tab) => tab.id !== tabId);
+    for (const listener of this.removedListeners) listener(tabId);
+  }
+}
+
 export function installFakeChromeApi(): {
   local: FakeStorageArea;
   session: FakeStorageArea;
+  tabs: FakeTabsApi;
   reset: () => void;
 } {
   const local = new FakeStorageArea("local");
   const session = new FakeStorageArea("session");
+  const tabs = new FakeTabsApi();
 
   (globalThis as unknown as { chrome: unknown }).chrome = {
     storage: { local, session },
@@ -79,11 +159,13 @@ export function installFakeChromeApi(): {
       setBadgeBackgroundColor: async () => undefined,
       openPopup: async () => undefined,
     },
+    tabs,
   };
 
   return {
     local,
     session,
+    tabs,
     reset: () => {
       local.clear();
       session.clear();

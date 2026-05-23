@@ -7,8 +7,10 @@ import { handleMessage } from "../src/background/index.js";
 const TEST_KEY = "0x" + "11".repeat(32);
 
 describe("background router", () => {
+  let chromeApi: ReturnType<typeof installFakeChromeApi>;
+
   beforeEach(async () => {
-    installFakeChromeApi();
+    chromeApi = installFakeChromeApi();
     await setVault(await encryptVault(TEST_KEY, "pw-123"));
     await setConfig({
       allowedOrigin: "https://evoevo.ai",
@@ -79,5 +81,51 @@ describe("background router", () => {
     expect((response as any).error.message).toBe("Automation paused");
     // Resume for subsequent tests (reset state)
     await handleMessage({ type: "resume" }, {} as chrome.runtime.MessageSender);
+  });
+
+  it("starts automation in a dedicated EvoEvo tab", async () => {
+    const response = await handleMessage(
+      { type: "start-dedicated" },
+      {} as chrome.runtime.MessageSender,
+    );
+
+    expect(response).toMatchObject({
+      ok: true,
+      tabId: 1,
+      created: true,
+      tabsNotified: 1,
+    });
+    expect(chromeApi.tabs._tabs()).toMatchObject([
+      { id: 1, url: "https://evoevo.ai/feed?chainId=16661" },
+    ]);
+    expect(chromeApi.tabs._messages()).toMatchObject([
+      {
+        tabId: 1,
+        message: {
+          type: "start-automation",
+          cooldownMs: 0,
+          stopAtRemaining: 0,
+        },
+      },
+    ]);
+  });
+
+  it("reports when the dedicated automation tab is closed", async () => {
+    const startResponse = await handleMessage(
+      { type: "start-dedicated" },
+      {} as chrome.runtime.MessageSender,
+    );
+    const tabId = (startResponse as unknown as { tabId: number }).tabId;
+
+    chromeApi.tabs._remove(tabId);
+
+    const status = await handleMessage(
+      { type: "get-status" },
+      {} as chrome.runtime.MessageSender,
+    );
+    expect(status).toMatchObject({
+      ok: true,
+      automationTab: { state: "closed", id: tabId },
+    });
   });
 });
