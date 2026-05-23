@@ -85,24 +85,47 @@ Bấm **Save**. Status hiển thị "Saved" màu xanh.
 
 ---
 
-## 4. Tắt Rabby trên `evoevo.ai`
+## 4. Chế độ hoạt động — Proxy Rabby (recommend)
 
-Cả Rabby và Auto EvoEvo đều muốn làm `window.ethereum`. Để extension thắng, tắt Rabby riêng cho site này:
+EvoEvo dùng Reown (WalletConnect) modal mà modal đó chỉ chấp nhận ví trong WalletConnect Cloud registry. EIP-6963 announce và `isMetaMask` spoof đều bị Reown từ chối. **Giải pháp:** giữ Rabby cho luồng Connect, extension **proxy** `window.ethereum` để intercept riêng `eth_sendTransaction`.
 
-**Rabby:** Settings → Connected Sites → tìm `evoevo.ai` → Disconnect, hoặc:
-- Rabby settings → "Inject script" → Disable cho `evoevo.ai`.
+### Setup khi có Rabby
 
-Hoặc disable Rabby toàn cục khi automation đang chạy (`chrome://extensions` → tắt toggle Rabby).
+1. **Cùng burner key trong cả 2 chỗ:**
+   - Tạo burner wallet mới (vd MetaMask devtool, hoặc `node -e "console.log(require('ethers').Wallet.createRandom().privateKey)"`)
+   - Import key đó vào **Rabby** (Add account → Import private key)
+   - Import **cùng key đó** vào Auto EvoEvo Options (private key + master password)
+2. Nạp ít OG vào địa chỉ này.
+3. Trong Rabby, switch sang account burner trước khi connect EvoEvo.
 
-> Nếu sau này muốn dùng lại Rabby trên evoevo.ai → bật lại, nhưng nhớ disable Auto EvoEvo nếu không cần.
+### Workflow
 
-### Lưu ý về wallet picker của EvoEvo
+```
+Page calls window.ethereum.request(...)
+              │
+              ▼
+   ┌──────────────────────────────────┐
+   │  Proxy của Auto EvoEvo           │
+   │                                  │
+   │  eth_sendTransaction → INTERCEPT │── route về background → guard → tự ký
+   │                                  │
+   │  eth_requestAccounts             │
+   │  eth_chainId                     │── delegate qua Rabby (popup user
+   │  personal_sign                   │      confirm như bình thường)
+   │  wallet_switchEthereumChain      │
+   │  ...                             │
+   └──────────────────────────────────┘
+```
 
-EvoEvo dùng Reown (WalletConnect) modal. Modal này chỉ list các ví trong WalletConnect Cloud registry — **không có "Auto EvoEvo"** dù mình announce qua EIP-6963.
+Tức là:
+- Bấm Connect trên EvoEvo → Rabby popup → bạn approve → page thấy burner address
+- Bấm ADD TO MEMORY → KHÔNG có popup Rabby → extension tự ký bằng key bạn đã import → broadcast → page thấy txHash
 
-**Workaround:** extension set `window.ethereum.isMetaMask = true` (de-facto convention, Rabby/Brave/Trust đều làm vậy). Trong picker bạn **click "MetaMask"** — Reown sẽ gọi `window.ethereum` (chính là Auto EvoEvo nếu Rabby tắt) → connect bình thường.
+### Standalone mode (khi không có Rabby)
 
-Tức là: picker hiện icon con cáo MetaMask, nhưng thực ra đang connect bằng burner key của Auto EvoEvo.
+Nếu Rabby tắt hoàn toàn → extension fallback sang standalone mode: là `window.ethereum` thẳng. Picker Reown sẽ không thấy mình (vì không trong registry), nên cần dApp khác hoặc tự call thẳng `window.ethereum`. **Trong thực tế dùng EvoEvo, để Rabby on + dùng proxy là phương án khả thi nhất.**
+
+> Cảnh báo: cùng 1 burner key ở 2 nơi = double surface area. Chỉ dùng burner, KHÔNG dùng ví chính.
 
 ---
 
