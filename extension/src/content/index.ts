@@ -40,7 +40,7 @@ window.addEventListener("message", (event: MessageEvent) => {
 
     if (data.method === "eth_sendTransaction") {
       if (resp.ok === true) {
-        pushOutcome({ ok: true, txHash: String(resp.txHash ?? "") });
+        pushOutcome({ ok: true, txHash: String(resp.result ?? "") });
       } else {
         const err = (resp.error as { code?: number; message?: string } | undefined) ?? {};
         pushOutcome({

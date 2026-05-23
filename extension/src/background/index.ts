@@ -9,6 +9,31 @@ const wallet = new Wallet();
 const log = new SessionLog();
 let paused = false;
 
+const READ_ONLY_METHODS = new Set([
+  "eth_blockNumber",
+  "eth_getBlockByNumber",
+  "eth_getBlockByHash",
+  "eth_getBalance",
+  "eth_getCode",
+  "eth_getStorageAt",
+  "eth_call",
+  "eth_estimateGas",
+  "eth_gasPrice",
+  "eth_feeHistory",
+  "eth_maxPriorityFeePerGas",
+  "eth_getTransactionByHash",
+  "eth_getTransactionReceipt",
+  "eth_getTransactionCount",
+  "eth_getLogs",
+  "eth_getFilterChanges",
+  "eth_getFilterLogs",
+  "eth_newFilter",
+  "eth_newBlockFilter",
+  "eth_uninstallFilter",
+  "eth_syncing",
+  "web3_clientVersion",
+]);
+
 export type RouterResponse =
   | { ok: true; [key: string]: unknown }
   | { ok: false; error: { code: number; message: string } };
@@ -79,10 +104,6 @@ export async function handleMessage(
     }
 
     case "rpc-request": {
-      if (paused) {
-        return { ok: false, error: { code: 4001, message: "Automation paused" } };
-      }
-
       const origin = senderOrigin(sender);
       if (origin === null) {
         return { ok: false, error: { code: 4001, message: "Origin missing" } };
@@ -93,25 +114,90 @@ export async function handleMessage(
         return { ok: false, error: { code: 4100, message: "Extension not configured" } };
       }
 
-      if (message.method !== "eth_sendTransaction") {
-        return { ok: false, error: { code: 4200, message: `Unsupported method: ${message.method}` } };
+      // Wallet/chain identity methods — answer locally without RPC.
+      if (
+        message.method === "eth_requestAccounts" ||
+        message.method === "eth_accounts"
+      ) {
+        return { ok: true, result: wallet.address === null ? [] : [wallet.address] };
       }
 
-      const rpc = new RpcClient(config.rpcUrl);
-      const result = await runPipeline({
-        method: message.method,
-        params: message.params,
-        senderOrigin: origin,
-        config,
-        wallet,
-        rpc,
-        log,
-      });
-
-      if (result.ok) {
-        return { ok: true, txHash: result.txHash };
+      if (message.method === "eth_chainId") {
+        return { ok: true, result: "0x" + config.chainId.toString(16) };
       }
-      return { ok: false, error: { code: result.errorCode, message: result.reason } };
+
+      if (message.method === "net_version") {
+        return { ok: true, result: String(config.chainId) };
+      }
+
+      if (message.method === "wallet_switchEthereumChain") {
+        const param = (message.params[0] ?? {}) as { chainId?: unknown };
+        const requested =
+          typeof param.chainId === "string"
+            ? Number.parseInt(param.chainId, 16)
+            : null;
+        if (requested !== config.chainId) {
+          return {
+            ok: false,
+            error: { code: 4902, message: `Unsupported chain: ${param.chainId}` },
+          };
+        }
+        return { ok: true, result: null };
+      }
+
+      if (message.method === "wallet_addEthereumChain") {
+        // Treat as no-op if it matches our configured chain; otherwise reject.
+        const param = (message.params[0] ?? {}) as { chainId?: unknown };
+        const requested =
+          typeof param.chainId === "string"
+            ? Number.parseInt(param.chainId, 16)
+            : null;
+        if (requested !== config.chainId) {
+          return {
+            ok: false,
+            error: { code: 4902, message: `Cannot add chain: ${param.chainId}` },
+          };
+        }
+        return { ok: true, result: null };
+      }
+
+      if (message.method === "eth_sendTransaction") {
+        if (paused) {
+          return { ok: false, error: { code: 4001, message: "Automation paused" } };
+        }
+        const rpc = new RpcClient(config.rpcUrl);
+        const result = await runPipeline({
+          method: message.method,
+          params: message.params,
+          senderOrigin: origin,
+          config,
+          wallet,
+          rpc,
+          log,
+        });
+        if (result.ok) {
+          return { ok: true, result: result.txHash };
+        }
+        return { ok: false, error: { code: result.errorCode, message: result.reason } };
+      }
+
+      // Forward read-only methods to the configured RPC. Reject any write
+      // method we have not explicitly approved above.
+      if (READ_ONLY_METHODS.has(message.method)) {
+        try {
+          const rpc = new RpcClient(config.rpcUrl);
+          const result = await rpc.call<unknown>(message.method, message.params);
+          return { ok: true, result };
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          return { ok: false, error: { code: -32603, message: reason } };
+        }
+      }
+
+      return {
+        ok: false,
+        error: { code: 4200, message: `Unsupported method: ${message.method}` },
+      };
     }
 
     default:
