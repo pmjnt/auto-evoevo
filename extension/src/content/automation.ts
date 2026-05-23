@@ -15,10 +15,15 @@ export type Outcome =
 export type AutomationDeps = {
   nextOutcome: () => Promise<Outcome>;
   onEvent: (event: AutomationEvent) => void;
+  cooldownMs?: number;
 };
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function runAutomation(deps: AutomationDeps): Promise<void> {
   deps.onEvent({ type: "started" });
+  const cooldownMs = Math.max(0, deps.cooldownMs ?? 0);
   let attemptId = 0;
   let idleExpansions = 0;
   let index = 0;
@@ -42,6 +47,11 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
 
     if (outcome.ok) {
       deps.onEvent({ type: "approved", txHash: outcome.txHash });
+      // Cool-down between approved transactions. Helps when the EvoEvo
+      // contract throttles per-user submissions or when the RPC node's
+      // mempool needs time to absorb the previous broadcast before the
+      // next nonce / gas estimate is accurate.
+      if (cooldownMs > 0) await sleep(cooldownMs);
       continue;
     }
 

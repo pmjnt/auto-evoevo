@@ -49,6 +49,7 @@ export const setConfigSchema = z.object({
     maxFeeNative: z.number().positive(),
     dryRun: z.boolean(),
     idleLockMinutes: z.number().int().positive(),
+    cooldownSeconds: z.number().int().min(0).max(300).default(0),
   }),
 });
 

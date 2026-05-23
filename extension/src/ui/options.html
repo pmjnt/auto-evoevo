@@ -33,6 +33,9 @@
   <label>Idle-lock minutes</label>
   <input id="idleLockMinutes" />
 
+  <label>Cooldown giữa mỗi tx (giây, 0 = không chờ)</label>
+  <input id="cooldownSeconds" type="number" min="0" max="300" value="3" />
+
   <label>
     <input type="checkbox" id="dryRun" checked />
     Dry-run mode (do not actually sign transactions)

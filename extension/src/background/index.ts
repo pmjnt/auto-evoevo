@@ -83,13 +83,17 @@ export async function handleMessage(
 
     case "resume": {
       paused = false;
-      const tabsNotified = await broadcastStartToEvoEvoTabs();
+      const tabsNotified = await broadcastStartToEvoEvoTabs(
+        await currentCooldownMs(),
+      );
       return { ok: true, tabsNotified };
     }
 
     case "start": {
       paused = false;
-      const tabsNotified = await broadcastStartToEvoEvoTabs();
+      const tabsNotified = await broadcastStartToEvoEvoTabs(
+        await currentCooldownMs(),
+      );
       return { ok: true, tabsNotified };
     }
 
@@ -221,8 +225,13 @@ function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
   }
 }
 
-async function broadcastStartToEvoEvoTabs(): Promise<number> {
-  return await broadcastToEvoEvoTabs({ type: "start-automation" });
+async function broadcastStartToEvoEvoTabs(cooldownMs: number): Promise<number> {
+  return await broadcastToEvoEvoTabs({ type: "start-automation", cooldownMs });
+}
+
+async function currentCooldownMs(): Promise<number> {
+  const config = await getConfig();
+  return Math.max(0, (config?.cooldownSeconds ?? 0) * 1000);
 }
 
 async function broadcastWalletEventToEvoEvoTabs(

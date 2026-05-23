@@ -26,6 +26,7 @@ export type ExtensionConfig = {
   maxFeeNative: number;
   dryRun: boolean;
   idleLockMinutes: number;
+  cooldownSeconds: number;
 };
 
 export type AttemptStatus =
