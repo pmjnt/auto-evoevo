@@ -1,6 +1,8 @@
 const MARKER = "data-auto-evoevo-attempted-id";
 const IDLE_LIMIT = 2;
 const DEFAULT_OUTCOME_TIMEOUT_MS = 10_000;
+const DEFAULT_MODAL_CLOSE_TIMEOUT_MS = 90_000;
+const MODAL_POLL_MS = 250;
 
 export type AutomationEvent =
   | { type: "started" }
@@ -18,6 +20,7 @@ export type AutomationDeps = {
   onEvent: (event: AutomationEvent) => void;
   cooldownMs?: number;
   outcomeTimeoutMs?: number;
+  modalCloseTimeoutMs?: number;
   // Stop when the count of unmarked ADD TO MEMORY buttons drops to this
   // number AND no SHOW MORE button is available. Acts as a buffer so we
   // don't drain the feed when we can't refill.
@@ -34,6 +37,10 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
   const outcomeTimeoutMs = Math.max(
     1,
     deps.outcomeTimeoutMs ?? DEFAULT_OUTCOME_TIMEOUT_MS,
+  );
+  const modalCloseTimeoutMs = Math.max(
+    1,
+    deps.modalCloseTimeoutMs ?? DEFAULT_MODAL_CLOSE_TIMEOUT_MS,
   );
   let attemptId = 0;
   let idleExpansions = 0;
@@ -62,6 +69,14 @@ export async function runAutomation(deps: AutomationDeps): Promise<void> {
 
     if (outcome.ok) {
       deps.onEvent({ type: "approved", txHash: outcome.txHash });
+      const modalClosed = await waitForSubmittingModalToClose(modalCloseTimeoutMs);
+      if (!modalClosed) {
+        deps.onEvent({
+          type: "paused",
+          reason: "Timed out waiting for EvoEvo submission modal to close",
+        });
+        return;
+      }
       // Cool-down between approved transactions. Helps when the EvoEvo
       // contract throttles per-user submissions or when the RPC node's
       // mempool needs time to absorb the previous broadcast before the
@@ -110,6 +125,21 @@ async function waitForOutcome(
         });
       });
   });
+}
+
+async function waitForSubmittingModalToClose(timeoutMs: number): Promise<boolean> {
+  if (!hasSubmittingModal()) return true;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await sleep(MODAL_POLL_MS);
+    if (!hasSubmittingModal()) return true;
+  }
+  return !hasSubmittingModal();
+}
+
+function hasSubmittingModal(): boolean {
+  const text = document.body.textContent ?? "";
+  return /submitting on-chain/i.test(text) || /loading your agents/i.test(text);
 }
 
 function nextMemoryButton(): HTMLElement | null {

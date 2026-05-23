@@ -73,6 +73,43 @@ describe("automation loop", () => {
     ]);
   });
 
+  it("waits for the submitting modal to close before clicking the next item", async () => {
+    vi.useFakeTimers();
+    buildFeedDom(2);
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const firstButton = buttons[0] as HTMLButtonElement;
+    const secondButton = buttons[1] as HTMLButtonElement;
+    const modal = document.createElement("div");
+    const clicked: string[] = [];
+
+    firstButton.addEventListener("click", () => {
+      clicked.push("first");
+      modal.textContent = "Submitting On-Chain Loading your agents...";
+      document.body.append(modal);
+    });
+    secondButton.addEventListener("click", () => {
+      clicked.push("second");
+    });
+
+    const runPromise = runAutomation({
+      nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
+      modalCloseTimeoutMs: 1_000,
+      onEvent: () => undefined,
+    });
+
+    await Promise.resolve();
+    expect(clicked).toEqual(["first"]);
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(clicked).toEqual(["first"]);
+
+    modal.remove();
+    await vi.advanceTimersByTimeAsync(250);
+    await runPromise;
+
+    expect(clicked).toEqual(["first", "second"]);
+  });
+
   it("clicks SHOW MORE when no visible buttons and stops after 2 unproductive expansions", async () => {
     buildFeedDom(0, true);
     const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));
