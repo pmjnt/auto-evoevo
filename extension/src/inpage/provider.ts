@@ -22,6 +22,10 @@ export type EIP1193Provider = {
   removeListener: (event: string, listener: (...args: unknown[]) => void) => void;
 };
 
+export type InstallProviderOptions = {
+  overrideWalletProvider?: boolean;
+};
+
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
@@ -33,6 +37,8 @@ const WRAPPED_MARKER = Symbol.for("auto-evoevo.wrapped");
 
 const pending = new Map<string, Pending>();
 const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+let overrideWalletProvider = true;
+let standaloneProvider: EIP1193Provider | null = null;
 
 function backgroundRequest(method: string, params: unknown[]): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -49,6 +55,11 @@ function installMessageBridge(): void {
   window.addEventListener("message", (event: MessageEvent) => {
     const data = event.data;
     if (data?.source !== SOURCE_EXT || data?.target !== "page") return;
+
+    if (data.type === "provider-config") {
+      setOverrideWalletProvider(data.overrideWalletProvider !== false);
+      return;
+    }
 
     if (data.type === "rpc-response" && typeof data.id === "string") {
       const handler = pending.get(data.id);
@@ -98,6 +109,7 @@ function wrapHostProvider(host: Record<string | symbol, unknown>): unknown {
   return new Proxy(host, {
     get(target, prop) {
       if (prop === WRAPPED_MARKER) return true;
+      if (prop === WRAPPED_HOST) return host;
       if (prop === "isAutoEvoEvo") return true;
       if (prop === "request") {
         const original = target["request"] as (args: {
@@ -137,6 +149,7 @@ function setWindowEthereum(provider: unknown): boolean {
 
 function ensureProvider(standalone: EIP1193Provider): void {
   const eth = (window as unknown as { ethereum?: unknown }).ethereum;
+  if (!overrideWalletProvider && eth) return;
   if (eth && (eth as { [WRAPPED_MARKER]?: boolean })[WRAPPED_MARKER]) return;
 
   if (eth) {
@@ -146,6 +159,19 @@ function ensureProvider(standalone: EIP1193Provider): void {
   }
   // Nothing injected. Install our standalone provider.
   setWindowEthereum(standalone);
+}
+
+const WRAPPED_HOST = Symbol.for("auto-evoevo.host");
+
+function setOverrideWalletProvider(enabled: boolean): void {
+  overrideWalletProvider = enabled;
+  const eth = (window as unknown as { ethereum?: unknown }).ethereum;
+  if (!enabled) {
+    const host = (eth as { [WRAPPED_HOST]?: unknown } | undefined)?.[WRAPPED_HOST];
+    if (host) setWindowEthereum(host);
+    return;
+  }
+  if (standaloneProvider) ensureProvider(standaloneProvider);
 }
 
 const ICON_DATA_URL =
@@ -179,6 +205,7 @@ function setupAnnounceInterception(): void {
   window.addEventListener(
     "eip6963:announceProvider",
     (event: Event) => {
+      if (!overrideWalletProvider) return;
       const detail = (event as CustomEvent).detail as
         | { info?: Record<string, unknown>; provider?: unknown }
         | undefined;
@@ -213,11 +240,13 @@ function setupAnnounceInterception(): void {
   );
 }
 
-export function installProvider(): EIP1193Provider {
+export function installProvider(options: InstallProviderOptions = {}): EIP1193Provider {
+  overrideWalletProvider = options.overrideWalletProvider ?? true;
   installMessageBridge();
   setupAnnounceInterception();
 
   const standalone = makeStandaloneProvider();
+  standaloneProvider = standalone;
   ensureProvider(standalone);
 
   // Re-claim periodically so a late-injecting wallet (e.g. Rabby) gets

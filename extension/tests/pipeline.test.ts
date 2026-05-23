@@ -14,6 +14,7 @@ const config: ExtensionConfig = {
   dryRun: false,
   idleLockMinutes: 30,
   cooldownSeconds: 0,
+  overrideWalletProvider: true,
   stopAtRemaining: 0,
 };
 

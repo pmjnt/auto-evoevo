@@ -13,6 +13,7 @@ function setupOptionsDom(): void {
     <input id="allowedContracts" value="0x61bb710000000000000000000000000000e937f9" />
     <input id="allowedFunctionSelectors" value="0xd0e30db0" />
     <input id="dryRun" type="checkbox" checked />
+    <input id="overrideWalletProvider" type="checkbox" checked />
     <input id="privateKey" value="" />
     <input id="password" value="" />
     <button id="save">Save configuration</button>
@@ -54,6 +55,7 @@ describe("options page", () => {
     expect(saveMessage?.config).toMatchObject({
       cooldownSeconds: 7,
       idleLockMinutes: 30,
+      overrideWalletProvider: true,
     });
     expect(document.getElementById("msg")?.textContent).toBe("Saved");
   });

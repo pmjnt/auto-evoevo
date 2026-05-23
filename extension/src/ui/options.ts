@@ -12,6 +12,7 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   dryRun: true,
   idleLockMinutes: 30,
   cooldownSeconds: 3,
+  overrideWalletProvider: true,
   stopAtRemaining: 10,
 };
 
@@ -48,6 +49,7 @@ function fillConfig(config: ExtensionConfig): void {
   setValue("cooldownSeconds", config.cooldownSeconds);
   setValue("stopAtRemaining", config.stopAtRemaining);
   setChecked("dryRun", config.dryRun);
+  setChecked("overrideWalletProvider", config.overrideWalletProvider);
 }
 
 async function loadConfig(): Promise<void> {
@@ -66,6 +68,9 @@ void loadConfig();
 
 document.getElementById("save")?.addEventListener("click", async () => {
   const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;
+  const overrideWalletProviderEl = document.getElementById(
+    "overrideWalletProvider",
+  ) as HTMLInputElement | null;
   const config = {
     allowedOrigin: "https://evoevo.ai",
     allowedChain: "0G",
@@ -75,6 +80,7 @@ document.getElementById("save")?.addEventListener("click", async () => {
     allowedFunctionSelectors: value("allowedFunctionSelectors").split(",").map((s) => s.trim()).filter(Boolean),
     maxFeeNative: Number(value("maxFeeNative")),
     dryRun: dryRunEl?.checked ?? true,
+    overrideWalletProvider: overrideWalletProviderEl?.checked ?? true,
     idleLockMinutes: Number(value("idleLockMinutes", "30")) || 30,
     cooldownSeconds: Math.max(0, Math.min(300, Number(value("cooldownSeconds")) || 0)),
     stopAtRemaining: Math.max(0, Math.min(1000, Number(value("stopAtRemaining")) || 0)),

@@ -23,6 +23,7 @@ describe("background router", () => {
       dryRun: true,
       idleLockMinutes: 30,
       cooldownSeconds: 0,
+      overrideWalletProvider: true,
       stopAtRemaining: 0,
     });
     // Reset module-level wallet state

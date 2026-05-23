@@ -34,6 +34,34 @@ function nextOutcome(signal: AbortSignal): Promise<Outcome> {
 // (see manifest.json), so we don't need to inject a <script src> here.
 // That older approach was blocked by evoevo.ai's CSP.
 
+function postProviderConfig(overrideWalletProvider: boolean): void {
+  window.postMessage(
+    {
+      source: SOURCE_EXT,
+      target: "page",
+      type: "provider-config",
+      overrideWalletProvider,
+    },
+    "*",
+  );
+}
+
+function syncProviderConfig(): void {
+  chrome.runtime.sendMessage({ type: "get-config" }, (response: unknown) => {
+    const config = (response as { ok?: boolean; config?: { overrideWalletProvider?: boolean } | null })?.config;
+    postProviderConfig(config?.overrideWalletProvider ?? true);
+  });
+}
+
+syncProviderConfig();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes["config"]) return;
+  const config = changes["config"].newValue as
+    | { overrideWalletProvider?: boolean }
+    | undefined;
+  postProviderConfig(config?.overrideWalletProvider ?? true);
+});
+
 window.addEventListener("message", (event: MessageEvent) => {
   const data = event.data;
   if (data?.source !== SOURCE_PAGE || data?.target !== "ext") return;

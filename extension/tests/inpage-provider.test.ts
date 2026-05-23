@@ -68,6 +68,65 @@ describe("inpage provider", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(cb).toHaveBeenCalledWith("0x41");
   });
+
+  it("does not override an existing wallet when override is disabled", () => {
+    const host = {
+      request: vi.fn(async () => "host-result"),
+    };
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      writable: true,
+      value: host,
+    });
+
+    installProvider({ overrideWalletProvider: false });
+
+    expect((window as unknown as { ethereum?: unknown }).ethereum).toBe(host);
+  });
+
+  it("does not intercept EIP-6963 wallet announces when override is disabled", () => {
+    installProvider({ overrideWalletProvider: false });
+    const seen: Array<{ info?: Record<string, unknown>; provider?: unknown }> = [];
+    window.addEventListener("eip6963:announceProvider", (event) => {
+      seen.push((event as CustomEvent).detail);
+    });
+
+    const rabby = { request: vi.fn() };
+    window.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", {
+        detail: { info: { rdns: "io.rabby" }, provider: rabby },
+      }),
+    );
+
+    expect(seen.some((detail) => detail.provider === rabby)).toBe(true);
+  });
+
+  it("restores a wrapped wallet when override is disabled by config message", async () => {
+    const host = {
+      request: vi.fn(async () => "host-result"),
+    };
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      writable: true,
+      value: host,
+    });
+
+    installProvider();
+    expect((window as unknown as { ethereum?: unknown }).ethereum).not.toBe(host);
+
+    window.postMessage(
+      {
+        source: "auto-evoevo-ext",
+        target: "page",
+        type: "provider-config",
+        overrideWalletProvider: false,
+      },
+      "*",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect((window as unknown as { ethereum?: unknown }).ethereum).toBe(host);
+  });
 });
 
 async function captureLastPostMessage(): Promise<{ id: string; method: string; type: string }> {
