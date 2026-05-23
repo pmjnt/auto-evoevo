@@ -152,20 +152,66 @@ const ANNOUNCE_DETAIL = (provider: EIP1193Provider) =>
     provider,
   });
 
+// Intercept other wallets' EIP-6963 announces in the CAPTURE phase before
+// any page listener sees them, swap the announced provider for a wrapped
+// copy, and re-dispatch. Reown / wagmi / RainbowKit store the wrapped
+// reference and call into it for every subsequent request — including
+// eth_sendTransaction, which is where we want to hijack.
+const REWRAPPED_INFO_FLAG = "__autoEvoEvoWrapped";
+
+function setupAnnounceInterception(): void {
+  window.addEventListener(
+    "eip6963:announceProvider",
+    (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { info?: Record<string, unknown>; provider?: unknown }
+        | undefined;
+      if (!detail) return;
+
+      // Skip our own re-dispatches.
+      if (detail.info?.[REWRAPPED_INFO_FLAG]) return;
+      if (detail.info?.["rdns"] === "ai.evoevo.auto") return;
+
+      // Skip if the announced provider is already our wrapper.
+      if ((detail.provider as { [WRAPPED_MARKER]?: boolean } | undefined)?.[WRAPPED_MARKER])
+        return;
+
+      // Stop the original event so page listeners don't see the raw
+      // provider. We will immediately re-emit a wrapped copy.
+      event.stopImmediatePropagation();
+
+      const wrapped = wrapHostProvider(
+        detail.provider as Record<string | symbol, unknown>,
+      );
+      window.dispatchEvent(
+        new CustomEvent("eip6963:announceProvider", {
+          detail: {
+            ...detail,
+            info: { ...detail.info, [REWRAPPED_INFO_FLAG]: true },
+            provider: wrapped,
+          },
+        }),
+      );
+    },
+    true, // CAPTURE phase, runs before page-level listeners
+  );
+}
+
 export function installProvider(): EIP1193Provider {
   installMessageBridge();
+  setupAnnounceInterception();
 
   const standalone = makeStandaloneProvider();
   ensureProvider(standalone);
 
   // Re-claim periodically so a late-injecting wallet (e.g. Rabby) gets
-  // wrapped instead of replacing us.
+  // wrapped instead of replacing us at window.ethereum.
   setInterval(() => ensureProvider(standalone), 200);
 
-  // EIP-6963 announce + respond. Picker that supports it will see us as
-  // a discrete wallet; pickers that ignore EIP-6963 still find us via
-  // isMetaMask spoof on the standalone provider OR via the proxy
-  // wrapping window.ethereum (which Reown's MetaMask entry resolves to).
+  // Announce our own standalone provider so pickers that support EIP-6963
+  // can offer us as a separate option. Foreign announces are still
+  // intercepted+wrapped above so eth_sendTransaction is hijacked regardless
+  // of which wallet the user picks.
   const detail = ANNOUNCE_DETAIL(standalone);
   const announce = (): void => {
     window.dispatchEvent(

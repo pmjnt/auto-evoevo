@@ -85,9 +85,11 @@ Bấm **Save**. Status hiển thị "Saved" màu xanh.
 
 ---
 
-## 4. Chế độ hoạt động — Proxy Rabby (recommend)
+## 4. Chế độ hoạt động — Intercept EIP-6963 announce (recommend)
 
-EvoEvo dùng Reown (WalletConnect) modal mà modal đó chỉ chấp nhận ví trong WalletConnect Cloud registry. EIP-6963 announce và `isMetaMask` spoof đều bị Reown từ chối. **Giải pháp:** giữ Rabby cho luồng Connect, extension **proxy** `window.ethereum` để intercept riêng `eth_sendTransaction`.
+EvoEvo dùng Reown picker. Reown đọc Rabby qua EIP-6963 announce event và **cache provider reference** từ event đó — không quan tâm `window.ethereum`. Mọi `request` sau này đi qua reference đã cache, KHÔNG đi qua `window.ethereum`.
+
+→ Cách duy nhất hoạt động: **bắt event EIP-6963 announce của Rabby ngay khi nó phát ra, wrap provider trong đó, rồi re-dispatch event với wrapped provider.** Reown sẽ cache wrapped version → mọi call sau đi qua mình → eth_sendTransaction bị intercept.
 
 ### Setup khi có Rabby
 
