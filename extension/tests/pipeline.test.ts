@@ -46,6 +46,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
           broadcasted.push(raw);
           return { txHash: "0xtx", refetchedNonce: null };
         }),
+        waitForReceipt: vi.fn(async () => ({ status: "success" as const })),
       },
       log: {
         append: vi.fn(async (entry: AttemptLog) => {
@@ -145,6 +146,58 @@ describe("pipeline.runPipeline", () => {
     } as any);
     expect(result.ok).toBe(false);
     expect(logged[0]!.status).toBe("manual_review");
+  });
+
+  it("logs reverted when receipt status is 0x0", async () => {
+    const { deps, logged } = makeDeps({
+      rpc: {
+        getTransactionCount: async () => 7,
+        gasPrice: async () => 1_000_000_000n,
+        estimateGas: async () => 50_000n,
+        sendRawTransaction: async () => "0xtx",
+        sendRawTransactionWithNonceRetry: async () => ({
+          txHash: "0xtx",
+          refetchedNonce: null,
+        }),
+        waitForReceipt: async () => ({ status: "reverted" as const }),
+      },
+    });
+    const result = await runPipeline({
+      method: "eth_sendTransaction",
+      params: [params],
+      senderOrigin: "https://evoevo.ai",
+      config,
+      ...deps,
+    } as any);
+    expect(result.ok).toBe(false);
+    expect(logged.at(-1)!.status).toBe("reverted");
+    expect(logged.at(-1)!.txHash).toBe("0xtx");
+  });
+
+  it("logs rpc_failed when receipt times out", async () => {
+    const { deps, logged } = makeDeps({
+      rpc: {
+        getTransactionCount: async () => 7,
+        gasPrice: async () => 1_000_000_000n,
+        estimateGas: async () => 50_000n,
+        sendRawTransaction: async () => "0xtx",
+        sendRawTransactionWithNonceRetry: async () => ({
+          txHash: "0xtx",
+          refetchedNonce: null,
+        }),
+        waitForReceipt: async () => "timeout" as const,
+      },
+    });
+    const result = await runPipeline({
+      method: "eth_sendTransaction",
+      params: [params],
+      senderOrigin: "https://evoevo.ai",
+      config,
+      ...deps,
+    } as any);
+    expect(result.ok).toBe(false);
+    expect(logged.at(-1)!.status).toBe("rpc_failed");
+    expect(logged.at(-1)!.reason).toMatch(/Receipt timeout/);
   });
 });
 

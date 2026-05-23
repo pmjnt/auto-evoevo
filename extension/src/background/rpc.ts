@@ -64,6 +64,31 @@ export class RpcClient {
     return await this.call<unknown | null>("eth_getTransactionReceipt", [hash]);
   }
 
+  // Block until the receipt arrives, then return whether the tx was mined
+  // successfully or reverted. Returns "timeout" if the receipt does not
+  // appear within the configured window — the pipeline pauses automation
+  // in that case so the user can investigate before further submissions.
+  async waitForReceipt(
+    hash: string,
+    options?: { intervalMs?: number; timeoutMs?: number },
+  ): Promise<{ status: "success" | "reverted"; receipt: unknown } | "timeout"> {
+    const intervalMs = options?.intervalMs ?? 2000;
+    const timeoutMs = options?.timeoutMs ?? 60_000;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const receipt = (await this.getTransactionReceipt(hash)) as
+        | { status?: string }
+        | null;
+      if (receipt !== null) {
+        const success = receipt.status === "0x1" || receipt.status === "0x01";
+        return { status: success ? "success" : "reverted", receipt };
+      }
+      await sleep(intervalMs);
+    }
+    return "timeout";
+  }
+
   async call<T>(method: string, params: unknown[]): Promise<T> {
     let lastError: unknown = null;
     for (let attempt = 0; attempt < BACKOFF_MS.length + 1; attempt += 1) {
