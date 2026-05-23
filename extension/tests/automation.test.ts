@@ -110,6 +110,34 @@ describe("automation loop", () => {
     expect(clicked).toEqual(["first", "second"]);
   });
 
+  it("does not wait on a hidden retained submitting modal", async () => {
+    vi.useFakeTimers();
+    buildFeedDom(2);
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const firstButton = buttons[0] as HTMLButtonElement;
+    const secondButton = buttons[1] as HTMLButtonElement;
+    const modal = document.createElement("div");
+    const clicked: string[] = [];
+
+    firstButton.addEventListener("click", () => {
+      clicked.push("first");
+      modal.textContent = "Submitting On-Chain Loading your agents...";
+      modal.style.display = "none";
+      document.body.append(modal);
+    });
+    secondButton.addEventListener("click", () => {
+      clicked.push("second");
+    });
+
+    await runAutomation({
+      nextOutcome: vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" })),
+      modalCloseTimeoutMs: 1_000,
+      onEvent: () => undefined,
+    });
+
+    expect(clicked).toEqual(["first", "second"]);
+  });
+
   it("clicks SHOW MORE when no visible buttons and stops after 2 unproductive expansions", async () => {
     buildFeedDom(0, true);
     const nextOutcome = vi.fn(async (): Promise<Outcome> => ({ ok: true, txHash: "0xtx" }));

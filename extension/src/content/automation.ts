@@ -138,8 +138,32 @@ async function waitForSubmittingModalToClose(timeoutMs: number): Promise<boolean
 }
 
 function hasSubmittingModal(): boolean {
-  const text = document.body.textContent ?? "";
-  return /submitting on-chain/i.test(text) || /loading your agents/i.test(text);
+  const elements = Array.from(document.body.querySelectorAll("*"));
+  return elements.some((element) => {
+    const text = element.textContent ?? "";
+    if (!/submitting on-chain|loading your agents/i.test(text)) return false;
+    return isVisibleElement(element);
+  });
+}
+
+function isVisibleElement(element: Element): boolean {
+  let current: Element | null = element;
+  while (current) {
+    if (current instanceof HTMLElement) {
+      const style = window.getComputedStyle(current);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.opacity === "0" ||
+        current.hidden ||
+        current.getAttribute("aria-hidden") === "true"
+      ) {
+        return false;
+      }
+    }
+    current = current.parentElement;
+  }
+  return element.isConnected;
 }
 
 function nextMemoryButton(): HTMLElement | null {
