@@ -14,7 +14,8 @@ describe("manifest.json", () => {
     expect(manifest.side_panel.default_path).toBe("popup.html");
     expect(manifest.action.default_icon["128"]).toBe("icons/icon-128.png");
     expect(manifest.icons["128"]).toBe("icons/icon-128.png");
-    expect(manifest.options_page).toBe("options.html");
+    // No options_page — settings are in the side panel.
+    expect(manifest.options_page).toBeUndefined();
     expect(manifest.permissions).toEqual(
       expect.arrayContaining([
         "storage",

@@ -35,6 +35,5 @@
   },
   "side_panel": {
     "default_path": "popup.html"
-  },
-  "options_page": "options.html"
+  }
 }

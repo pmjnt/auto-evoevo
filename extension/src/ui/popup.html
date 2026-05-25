@@ -21,7 +21,7 @@
       --red: #ff6b6b;
     }
     body {
-      width: 360px;
+      width: 380px;
       margin: 0;
       padding: 14px;
       overflow-x: hidden;
@@ -57,13 +57,9 @@
       background: #15120f;
       box-shadow: 0 10px 22px rgba(255, 122, 26, .13);
     }
-    .logo svg {
-      width: 33px;
-      height: 19px;
-      display: block;
-    }
+    .logo svg { width: 33px; height: 19px; display: block; }
     h1, p { margin: 0; }
-    h1 { font-size: 15px; line-height: 1.1; letter-spacing: 0; }
+    h1 { font-size: 15px; line-height: 1.1; }
     .sub { margin-top: 3px; color: var(--muted); font-size: 12px; }
     .badge {
       margin-left: auto;
@@ -77,32 +73,36 @@
       white-space: nowrap;
     }
     .body { padding: 14px; }
-    label { display: block; margin-bottom: 6px; color: var(--soft); font-size: 12px; }
-    input, button { font: inherit; }
-    .input {
+    label { display: block; margin-bottom: 4px; color: var(--soft); font-size: 11px; }
+    .hint { color: #9b8066; font-size: 10px; }
+    .field-label { display: flex; justify-content: space-between; gap: 8px; }
+    input, select, button { font: inherit; }
+    .input, select {
       width: 100%;
       min-width: 0;
-      height: 38px;
-      padding: 9px 11px;
+      height: 36px;
+      padding: 8px 10px;
       border: 1px solid var(--border);
       border-radius: 7px;
       outline: none;
       background: var(--field);
       color: var(--text);
+      font: 650 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
     }
-    .input:focus {
+    .input:focus, select:focus {
       border-color: var(--orange);
       box-shadow: 0 0 0 3px rgba(255, 122, 26, .14);
     }
     .btn {
-      min-height: 36px;
-      padding: 0 14px;
+      min-height: 34px;
+      padding: 0 12px;
       border: 0;
       border-radius: 7px;
       background: linear-gradient(135deg, var(--orange), var(--orange-2));
       color: #160b04;
       cursor: pointer;
       font-weight: 850;
+      font-size: 12px;
       white-space: nowrap;
       box-shadow: 0 10px 22px rgba(255, 122, 26, .22);
     }
@@ -112,12 +112,16 @@
       color: var(--soft);
       box-shadow: none;
     }
-    .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; }
+    .btn.small { min-height: 28px; padding: 0 10px; font-size: 11px; }
+    .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 10px; }
+    .row.between { justify-content: space-between; }
+    .row.split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row.split > .field { min-width: 0; }
     .stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
-      margin-top: 12px;
+      margin-top: 10px;
     }
     .address {
       overflow: hidden;
@@ -128,7 +132,7 @@
     }
     .stat {
       min-width: 0;
-      padding: 10px;
+      padding: 8px 10px;
       border: 1px solid rgba(255, 126, 31, .18);
       border-radius: 7px;
       background: rgba(13, 11, 9, .72);
@@ -137,27 +141,73 @@
       display: block;
       overflow: hidden;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .stat strong {
-      display: block;
-      margin-top: 2px;
-      font-size: 18px;
-      line-height: 1.1;
-    }
+    .stat strong { display: block; margin-top: 2px; font-size: 15px; line-height: 1.1; }
     #status-text { color: var(--green); }
-    #unlock-error, #start-msg {
-      min-height: 16px;
-      margin-top: 10px;
+    .msg {
+      min-height: 14px;
+      margin-top: 8px;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       line-height: 1.35;
     }
-    #unlock-error { color: var(--red); }
+    .msg.err { color: var(--red); }
+    .msg.ok { color: var(--green); }
     section { display: none; }
     section.active { display: block; }
+    .config-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .config-section > h3 {
+      margin: 0 0 8px;
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+    .field { margin-bottom: 8px; }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 4px;
+      padding: 10px;
+      border: 1px solid var(--border-soft);
+      border-radius: 7px;
+      background: rgba(13, 11, 9, .72);
+    }
+    .toggle-row strong { display: block; font-size: 12px; }
+    .toggle-row span { display: block; color: var(--muted); font-size: 10px; }
+    .toggle-row label.tog {
+      position: relative; flex: 0 0 auto;
+      width: 38px; height: 22px; margin: 0; cursor: pointer;
+    }
+    .toggle-row label.tog input {
+      position: absolute; inset: 0; width: 38px; height: 22px; margin: 0; opacity: 0;
+    }
+    .toggle-track {
+      display: block; width: 38px; height: 22px;
+      border-radius: 999px; background: #3b2a1d;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+      transition: background .16s ease;
+    }
+    .toggle-track::after {
+      content: ""; position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff7ed; transition: transform .16s ease;
+    }
+    .toggle-row label.tog input:checked + .toggle-track {
+      background: linear-gradient(135deg, var(--orange), var(--orange-2));
+    }
+    .toggle-row label.tog input:checked + .toggle-track::after { transform: translateX(16px); }
+    .refresh-link { color: var(--orange); text-decoration: none; cursor: pointer; }
+    .refresh-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -172,21 +222,23 @@
       </div>
       <div>
         <h1>Auto EvoEvo</h1>
-        <p class="sub">Guarded 0G signer</p>
+        <p class="sub">Direct-API signer · 0G</p>
       </div>
       <div class="badge">0G</div>
     </header>
 
     <div class="body">
+      <!-- LOCKED VIEW -->
       <section id="locked" class="active">
         <label for="password">Master password</label>
         <input id="password" class="input" type="password" autocomplete="current-password" />
         <div class="row">
           <button id="unlock" class="btn">Unlock</button>
         </div>
-        <div id="unlock-error"></div>
+        <div id="unlock-error" class="msg err"></div>
       </section>
 
+      <!-- UNLOCKED VIEW: status + config -->
       <section id="unlocked">
         <div class="address" id="address"></div>
         <div class="stats">
@@ -195,13 +247,122 @@
           <div class="stat"><span>Dry-run</span><strong id="dry">0</strong></div>
           <div class="stat"><span>Manual</span><strong id="manual">0</strong></div>
           <div class="stat"><span>Rejected</span><strong id="rejected">0</strong></div>
+          <div class="stat"><span>Reverted</span><strong id="reverted">0</strong></div>
         </div>
         <div class="row">
           <button id="lock" class="btn ghost">Lock</button>
           <button id="pause" class="btn ghost">Pause</button>
           <button id="start" class="btn">Start</button>
         </div>
-        <div id="start-msg"></div>
+        <div id="start-msg" class="msg"></div>
+
+        <!-- AGENT -->
+        <div class="config-section">
+          <h3>Agent</h3>
+          <div class="field">
+            <div class="field-label">
+              <label for="agentId">Active agent</label>
+              <span class="hint"><a class="refresh-link" id="loadAgents">Refresh</a></span>
+            </div>
+            <select id="agentId">
+              <option value="0">— Refresh to load —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- NETWORK -->
+        <div class="config-section">
+          <h3>Network</h3>
+          <div class="field">
+            <label for="rpcUrl">0G RPC URL</label>
+            <input id="rpcUrl" class="input" placeholder="https://evmrpc.0g.ai" />
+          </div>
+          <div class="row split">
+            <div class="field">
+              <label for="chainId">Chain ID</label>
+              <input id="chainId" class="input" type="number" />
+            </div>
+            <div class="field">
+              <label for="maxFeeNative">Max fee (OG)</label>
+              <input id="maxFeeNative" class="input" type="text" placeholder="0.01" />
+            </div>
+          </div>
+        </div>
+
+        <!-- GUARDRAILS -->
+        <div class="config-section">
+          <h3>Guardrails</h3>
+          <div class="field">
+            <div class="field-label">
+              <label for="allowedContracts">Allowed contracts</label>
+              <span class="hint">comma-separated</span>
+            </div>
+            <input id="allowedContracts" class="input" />
+          </div>
+          <div class="field">
+            <div class="field-label">
+              <label for="allowedFunctionSelectors">Allowed selectors</label>
+              <span class="hint">4 bytes hex</span>
+            </div>
+            <input id="allowedFunctionSelectors" class="input" />
+          </div>
+          <label class="toggle-row" for="dryRun">
+            <span>
+              <strong>Dry-run mode</strong>
+              <span>Preview without signing</span>
+            </span>
+            <label class="tog">
+              <input type="checkbox" id="dryRun" checked />
+              <span class="toggle-track"></span>
+            </label>
+          </label>
+        </div>
+
+        <!-- LOOP -->
+        <div class="config-section">
+          <h3>Loop</h3>
+          <div class="row split">
+            <div class="field">
+              <div class="field-label">
+                <label for="cooldownSeconds">Cooldown (s)</label>
+                <span class="hint">0–300</span>
+              </div>
+              <input id="cooldownSeconds" class="input" type="number" min="0" max="300" />
+            </div>
+            <div class="field">
+              <div class="field-label">
+                <label for="stopAtRemaining">Stop at remaining</label>
+                <span class="hint">0 = drain</span>
+              </div>
+              <input id="stopAtRemaining" class="input" type="number" min="0" max="1000" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="idleLockMinutes">Idle lock (minutes)</label>
+            <input id="idleLockMinutes" class="input" type="number" min="1" />
+          </div>
+        </div>
+
+        <!-- VAULT -->
+        <div class="config-section">
+          <h3>Vault</h3>
+          <div class="field">
+            <div class="field-label">
+              <label for="privateKey">Private key</label>
+              <span class="hint">cleared on save</span>
+            </div>
+            <input id="privateKey" class="input" type="password" />
+          </div>
+          <div class="field">
+            <label for="vaultPassword">Master password</label>
+            <input id="vaultPassword" class="input" type="password" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="save" class="btn">Save settings</button>
+        </div>
+        <div id="save-msg" class="msg"></div>
       </section>
     </div>
   </main>
