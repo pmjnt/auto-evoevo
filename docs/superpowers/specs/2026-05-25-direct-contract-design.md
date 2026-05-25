@@ -72,11 +72,17 @@ The contract verifies the backend's `signature` against `msg.sender` (which is `
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Main loop                                                           │
 │                                                                     │
+│ TABS = ["recommended", "weekly", "monthly", "all_time"]             │
+│ tabIdx = 0                                                          │
 │ while not stopped:                                                  │
-│   GET /v1/platform/feeding?tab=recommended&limit=20&chain_id=...    │
+│   tab = TABS[tabIdx]                                                │
+│   GET /v1/platform/feeding?tab={tab}&limit=20&chain_id=...          │
 │                            &agent_id={agentId}&include_intaken=false│
 │        ↓ array of opinions                                          │
-│   if empty → emit "done", break                                     │
+│   if empty:                                                         │
+│     tabIdx += 1                                                     │
+│     if tabIdx >= TABS.length → emit "done", break                   │
+│     continue                                                        │
 │   if remaining <= stopAtRemaining → emit "done", break              │
 │                                                                     │
 │   for each opinion in array:                                        │
