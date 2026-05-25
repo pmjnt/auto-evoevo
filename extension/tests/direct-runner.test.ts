@@ -19,7 +19,6 @@ const baseConfig: ExtensionConfig = {
   allowedFunctionSelectors: ["0x4ed1f275"],
   maxFeeNative: 0.01,
   dryRun: false,
-  idleLockMinutes: 30,
   cooldownSeconds: 0,
   stopAtRemaining: 0,
   agentId: 8359,

@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
-import { encryptVault } from "../src/shared/crypto.js";
-import { setVault, setConfig } from "../src/background/storage.js";
+import { clearPrivateKey, setConfig } from "../src/background/storage.js";
 import { handleMessage } from "../src/background/index.js";
 
 const TEST_KEY = "0x" + "11".repeat(32);
 
-describe("background router (direct-only)", () => {
+describe("background router (no password)", () => {
   beforeEach(async () => {
     installFakeChromeApi();
-    await setVault(await encryptVault(TEST_KEY, "pw-123"));
+    await clearPrivateKey();
+    // Also reset the module-level Wallet instance via the router so its
+    // in-memory signer drops when previous tests imported a key.
+    await handleMessage({ type: "clear-private-key" });
     await setConfig({
       allowedOrigin: "https://evoevo.ai",
       allowedChain: "0G",
@@ -19,61 +21,56 @@ describe("background router (direct-only)", () => {
       allowedFunctionSelectors: ["0x4ed1f275"],
       maxFeeNative: 0.001,
       dryRun: true,
-      idleLockMinutes: 30,
       cooldownSeconds: 0,
       stopAtRemaining: 0,
       agentId: 0,
     });
-    // Reset module-level wallet state between tests.
-    await handleMessage({ type: "lock" });
   });
 
-  it("routes unlock and returns address", async () => {
-    const response = await handleMessage({ type: "unlock", password: "pw-123" });
+  it("set-private-key stores the key and exposes the address", async () => {
+    const response = await handleMessage({
+      type: "set-private-key",
+      privateKey: TEST_KEY,
+    });
     expect(response).toMatchObject({ ok: true });
     expect((response as { address?: string }).address).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
 
-  it("routes get-status with counts and running flag", async () => {
-    const response = (await handleMessage({ type: "get-status" })) as Record<string, unknown>;
-    expect(response.ok).toBe(true);
-    expect(response.locked).toBe(true);
-    expect(response.counts).toBeDefined();
-    expect(response.running).toBe(false);
-  });
-
-  it("routes get-config with the stored extension config", async () => {
-    const response = (await handleMessage({ type: "get-config" })) as {
-      ok: boolean;
-      config: { chainId: number; agentId: number };
-    };
-    expect(response.ok).toBe(true);
-    expect(response.config.chainId).toBe(16661);
-    expect(response.config.agentId).toBe(0);
-  });
-
-  it("get-agents fails when wallet is locked", async () => {
-    const response = await handleMessage({ type: "get-agents" });
-    expect(response).toMatchObject({
-      ok: false,
-      error: { code: 4100 },
+  it("set-private-key rejects malformed keys", async () => {
+    const response = await handleMessage({
+      type: "set-private-key",
+      privateKey: "0x" + "11".repeat(31),
     });
+    expect(response).toMatchObject({ ok: false });
   });
 
-  it("start refuses to run when wallet is locked", async () => {
-    const response = await handleMessage({ type: "start" });
-    expect(response).toMatchObject({
-      ok: false,
-      error: { code: 4100, message: "Wallet locked" },
-    });
-  });
-
-  it("pause toggles the paused flag", async () => {
-    await handleMessage({ type: "pause" });
+  it("clear-private-key removes the key and makes wallet not-ready", async () => {
+    await handleMessage({ type: "set-private-key", privateKey: TEST_KEY });
+    await handleMessage({ type: "clear-private-key" });
     const status = (await handleMessage({ type: "get-status" })) as unknown as {
-      paused: boolean;
+      ready: boolean;
     };
-    expect(status.paused).toBe(true);
+    expect(status.ready).toBe(false);
+  });
+
+  it("get-status returns ready=true after a key is set", async () => {
+    await handleMessage({ type: "set-private-key", privateKey: TEST_KEY });
+    const status = (await handleMessage({ type: "get-status" })) as unknown as {
+      ready: boolean;
+      address: string;
+    };
+    expect(status.ready).toBe(true);
+    expect(status.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
+  });
+
+  it("start refuses to run before a key is set", async () => {
+    const response = await handleMessage({ type: "start" });
+    expect(response).toMatchObject({ ok: false });
+  });
+
+  it("get-agents fails before a key is set", async () => {
+    const response = await handleMessage({ type: "get-agents" });
+    expect(response).toMatchObject({ ok: false });
   });
 
   it("rejects unknown message types", async () => {

@@ -1,7 +1,6 @@
 import { Wallet as EthersWallet } from "ethers";
 
-import { decryptVault } from "../shared/crypto.js";
-import { getVault } from "./storage.js";
+import { getPrivateKey } from "./storage.js";
 
 export type TxToSign = {
   to: string;
@@ -15,55 +14,42 @@ export type TxToSign = {
   chainId: number;
 };
 
-export type UnlockResult = { ok: true } | { ok: false; reason: string };
-
-export type WalletOptions = { idleLockMinutes?: number };
-
+// Plaintext-key wallet. The private key sits in chrome.storage.local
+// and is rehydrated on every service-worker wake. No password gate —
+// distribution is controlled out-of-band (e.g. one burner wallet per
+// recipient). Anyone with access to the Chrome profile has full
+// access to the key by design.
 export class Wallet {
   private signer: EthersWallet | null = null;
-  private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly idleMs: number;
-
-  constructor(options: WalletOptions = {}) {
-    this.idleMs = (options.idleLockMinutes ?? 30) * 60_000;
-  }
 
   get address(): string | null {
     return this.signer?.address ?? null;
   }
 
-  async unlock(password: string): Promise<UnlockResult> {
-    const vault = await getVault();
-    if (vault === null) return { ok: false, reason: "No vault stored" };
+  // Rehydrate from storage. Returns true if a key is present and parsed.
+  async ready(): Promise<boolean> {
+    if (this.signer !== null) return true;
+    const key = await getPrivateKey();
+    if (key === null) return false;
     try {
-      const privateKey = await decryptVault(vault, password);
-      this.signer = new EthersWallet(privateKey);
-      this.armIdleTimer();
-      return { ok: true };
+      this.signer = new EthersWallet(key);
+      return true;
     } catch {
       this.signer = null;
-      return { ok: false, reason: "Wrong password" };
+      return false;
     }
   }
 
-  lock(): void {
+  // Force reload from storage. Called after the user imports a new key.
+  async reload(): Promise<void> {
     this.signer = null;
-    if (this.idleTimer !== null) {
-      clearTimeout(this.idleTimer);
-      this.idleTimer = null;
-    }
-  }
-
-  private armIdleTimer(): void {
-    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.lock(), this.idleMs);
+    await this.ready();
   }
 
   async signTransaction(tx: TxToSign): Promise<string> {
-    if (this.signer === null) {
-      throw new Error("Wallet is locked");
+    if (!(await this.ready()) || this.signer === null) {
+      throw new Error("Wallet has no private key — import one first");
     }
-    this.armIdleTimer();
     return await this.signer.signTransaction({
       to: tx.to,
       data: tx.data,
@@ -77,13 +63,10 @@ export class Wallet {
     });
   }
 
-  // Sign an arbitrary message via personal_sign / EIP-191. Needed for
-  // the SIWE login flow against EvoEvo's REST API.
   async signMessage(message: string): Promise<string> {
-    if (this.signer === null) {
-      throw new Error("Wallet is locked");
+    if (!(await this.ready()) || this.signer === null) {
+      throw new Error("Wallet has no private key — import one first");
     }
-    this.armIdleTimer();
     return await this.signer.signMessage(message);
   }
 }

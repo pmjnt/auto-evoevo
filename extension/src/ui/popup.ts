@@ -10,7 +10,6 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   allowedFunctionSelectors: ["0x4ed1f275"],
   maxFeeNative: 0.01,
   dryRun: true,
-  idleLockMinutes: 30,
   cooldownSeconds: 1,
   stopAtRemaining: 10,
   agentId: 0,
@@ -18,7 +17,7 @@ const DEFAULT_CONFIG: ExtensionConfig = {
 
 type Status = {
   ok: boolean;
-  locked: boolean;
+  ready: boolean;
   address: string | null;
   paused: boolean;
   running?: boolean;
@@ -31,9 +30,9 @@ type AgentSummary = {
   onchain_identity: { identity_agent_id?: string } | null;
 };
 
-function show(id: "locked" | "unlocked"): void {
-  document.getElementById("locked")?.classList.toggle("active", id === "locked");
-  document.getElementById("unlocked")?.classList.toggle("active", id === "unlocked");
+function show(id: "setup" | "ready"): void {
+  document.getElementById("setup")?.classList.toggle("active", id === "setup");
+  document.getElementById("ready")?.classList.toggle("active", id === "ready");
 }
 
 function elValue(id: string, fallback = ""): string {
@@ -71,12 +70,13 @@ async function refreshStatus(): Promise<void> {
   const status = (await send({ type: "get-status" })) as Status;
   if (!status.ok) return;
   lastStatus = status;
-  if (status.locked) {
-    show("locked");
+  if (!status.ready) {
+    show("setup");
     return;
   }
-  show("unlocked");
+  show("ready");
   setText("address", status.address ?? "—");
+  setInput("walletAddress", status.address ?? "");
   setText("signed", String(status.counts["signed"] ?? 0));
   setText("dry", String(status.counts["dry_run"] ?? 0));
   setText("manual", String(status.counts["manual_review"] ?? 0));
@@ -112,13 +112,10 @@ function fillConfig(config: ExtensionConfig): void {
   setInput("maxFeeNative", config.maxFeeNative);
   setInput("allowedContracts", config.allowedContracts.join(", "));
   setInput("allowedFunctionSelectors", config.allowedFunctionSelectors.join(", "));
-  setInput("idleLockMinutes", config.idleLockMinutes);
   setInput("cooldownSeconds", config.cooldownSeconds);
   setInput("stopAtRemaining", config.stopAtRemaining);
   setChecked("dryRun", config.dryRun);
 
-  // Seed the agent dropdown with the saved id so it doesn't read 0
-  // before the user refreshes the live list.
   const agentSelect = document.getElementById("agentId") as HTMLSelectElement | null;
   if (agentSelect && config.agentId > 0) {
     agentSelect.innerHTML = `<option value="${config.agentId}">Saved: ${config.agentId} (refresh to verify)</option>`;
@@ -170,23 +167,29 @@ async function loadAgents(): Promise<void> {
 
 // --- WIRING ---
 
-document.getElementById("unlock")?.addEventListener("click", async () => {
-  const password = elValue("password");
-  const response = (await send({ type: "unlock", password })) as {
+document.getElementById("saveKey")?.addEventListener("click", async () => {
+  const privateKey = elValue("setupPrivateKey");
+  if (!privateKey) {
+    setMsg("setup-msg", "Paste a private key first.", "err");
+    return;
+  }
+  const response = (await send({ type: "set-private-key", privateKey })) as {
     ok: boolean;
+    address?: string;
     error?: { message: string };
   };
   if (!response.ok) {
-    setMsg("unlock-error", response.error?.message ?? "Failed to unlock", "err");
+    setMsg("setup-msg", response.error?.message ?? "Failed", "err");
     return;
   }
-  setMsg("unlock-error", "", "info");
+  setInput("setupPrivateKey", "");
   configLoaded = false;
   await refreshStatus();
 });
 
-document.getElementById("lock")?.addEventListener("click", async () => {
-  await send({ type: "lock" });
+document.getElementById("clearKey")?.addEventListener("click", async () => {
+  if (!window.confirm("Remove the private key from this Chrome install?")) return;
+  await send({ type: "clear-private-key" });
   configLoaded = false;
   await refreshStatus();
 });
@@ -239,45 +242,23 @@ document.getElementById("save")?.addEventListener("click", async () => {
       .filter(Boolean),
     maxFeeNative: Number(elValue("maxFeeNative")) || DEFAULT_CONFIG.maxFeeNative,
     dryRun: dryRunEl?.checked ?? true,
-    idleLockMinutes: Number(elValue("idleLockMinutes")) || 30,
     cooldownSeconds: Math.max(0, Math.min(300, Number(elValue("cooldownSeconds")) || 0)),
     stopAtRemaining: Math.max(0, Math.min(1000, Number(elValue("stopAtRemaining")) || 0)),
     agentId: Math.max(0, Number(elValue("agentId")) || 0),
   };
 
-  const setConfigResp = (await send({ type: "set-config", config })) as {
+  const resp = (await send({ type: "set-config", config })) as {
     ok: boolean;
     error?: { message: string };
   };
-  if (!setConfigResp.ok) {
-    setMsg("save-msg", `Failed to save: ${setConfigResp.error?.message ?? "unknown"}`, "err");
+  if (!resp.ok) {
+    setMsg("save-msg", `Failed to save: ${resp.error?.message ?? "unknown"}`, "err");
     return;
   }
-
-  const privateKey = elValue("privateKey");
-  const password = elValue("vaultPassword");
-  if (privateKey && password) {
-    const importResp = (await send({ type: "import-key", privateKey, password })) as {
-      ok: boolean;
-      error?: { message: string };
-    };
-    if (!importResp.ok) {
-      setMsg(
-        "save-msg",
-        `Config saved but key import failed: ${importResp.error?.message ?? "unknown"}`,
-        "err",
-      );
-      return;
-    }
-    setInput("privateKey", "");
-    setInput("vaultPassword", "");
-  }
-
   setMsg("save-msg", "Saved.", "ok");
 });
 
 void refreshStatus();
-
 setInterval(() => {
   void refreshStatus();
 }, 2000);

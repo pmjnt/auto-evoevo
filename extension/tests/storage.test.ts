@@ -1,15 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
-import { getVault, setVault, getConfig, setConfig } from "../src/background/storage.js";
+import {
+  clearPrivateKey,
+  getConfig,
+  getPrivateKey,
+  setConfig,
+  setPrivateKey,
+} from "../src/background/storage.js";
 import type { ExtensionConfig } from "../src/shared/types.js";
-import type { Vault } from "../src/shared/crypto.js";
-
-const fakeVault: Vault = {
-  version: 1,
-  salt: "c2FsdA==",
-  iv: "aXY=",
-  ciphertext: "Y2lwaGVy",
-};
 
 const fakeConfig: ExtensionConfig = {
   allowedOrigin: "https://evoevo.ai",
@@ -20,24 +18,35 @@ const fakeConfig: ExtensionConfig = {
   allowedFunctionSelectors: ["0xd0e30db0"],
   maxFeeNative: 0.001,
   dryRun: true,
-  idleLockMinutes: 30,
   cooldownSeconds: 0,
   stopAtRemaining: 0,
   agentId: 0,
 };
+
+const TEST_KEY = "0x" + "11".repeat(32);
 
 describe("storage", () => {
   beforeEach(() => {
     installFakeChromeApi();
   });
 
-  it("round-trips a vault", async () => {
-    await setVault(fakeVault);
-    expect(await getVault()).toEqual(fakeVault);
+  it("round-trips a private key", async () => {
+    await setPrivateKey(TEST_KEY);
+    expect(await getPrivateKey()).toBe(TEST_KEY);
   });
 
-  it("returns null when no vault is set", async () => {
-    expect(await getVault()).toBeNull();
+  it("returns null when no key is stored", async () => {
+    expect(await getPrivateKey()).toBeNull();
+  });
+
+  it("rejects a malformed private key", async () => {
+    await expect(setPrivateKey("not-hex")).rejects.toThrow();
+  });
+
+  it("clear removes the key", async () => {
+    await setPrivateKey(TEST_KEY);
+    await clearPrivateKey();
+    expect(await getPrivateKey()).toBeNull();
   });
 
   it("round-trips config", async () => {

@@ -1,5 +1,10 @@
 import { parseMessage } from "../shared/messages.js";
-import { getConfig, setConfig as persistConfig } from "./storage.js";
+import {
+  clearPrivateKey,
+  getConfig,
+  setConfig as persistConfig,
+  setPrivateKey,
+} from "./storage.js";
 import { Wallet } from "./wallet.js";
 import { RpcClient } from "./rpc.js";
 import { SessionLog } from "./session-log.js";
@@ -20,7 +25,10 @@ const evoEvoApi = new EvoEvoApiClient({
   tokenStorage: {
     load: async (): Promise<SiweAuth | null> => {
       if (typeof chrome === "undefined" || !chrome.storage?.session?.get) return null;
-      const stored = (await chrome.storage.session.get(SESSION_AUTH_KEY)) as Record<string, SiweAuth | undefined>;
+      const stored = (await chrome.storage.session.get(SESSION_AUTH_KEY)) as Record<
+        string,
+        SiweAuth | undefined
+      >;
       return stored[SESSION_AUTH_KEY] ?? null;
     },
     save: async (auth) => {
@@ -47,23 +55,36 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
   }
 
   switch (message.type) {
-    case "unlock": {
-      const result = await wallet.unlock(message.password);
-      if (!result.ok) {
-        return { ok: false, error: { code: 4100, message: result.reason } };
+    case "set-private-key": {
+      try {
+        await setPrivateKey(message.privateKey);
+        await wallet.reload();
+        return { ok: true, address: wallet.address };
+      } catch (error) {
+        return {
+          ok: false,
+          error: {
+            code: -32602,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        };
       }
-      return { ok: true, address: wallet.address };
     }
 
-    case "lock": {
-      wallet.lock();
+    case "clear-private-key": {
+      await clearPrivateKey();
+      await wallet.reload();
       await evoEvoApi.clearAuth();
       return { ok: true };
     }
 
     case "get-agents": {
-      if (wallet.address === null) {
-        return { ok: false, error: { code: 4100, message: "Wallet locked" } };
+      const ready = await wallet.ready();
+      if (!ready || wallet.address === null) {
+        return {
+          ok: false,
+          error: { code: 4100, message: "Wallet has no private key" },
+        };
       }
       const config = await getConfig();
       if (config === null) {
@@ -92,15 +113,17 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
       }
     }
 
-    case "get-status":
+    case "get-status": {
+      const ready = await wallet.ready();
       return {
         ok: true,
-        locked: wallet.address === null,
+        ready,
         address: wallet.address,
         paused,
         running: directLoopRunning,
         counts: await log.counts(),
       };
+    }
 
     case "get-config":
       return { ok: true, config: await getConfig() };
@@ -123,14 +146,6 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
       await persistConfig(message.config);
       return { ok: true };
 
-    case "import-key": {
-      const { encryptVault } = await import("../shared/crypto.js");
-      const { setVault } = await import("./storage.js");
-      const vault = await encryptVault(message.privateKey, message.password);
-      await setVault(vault);
-      return { ok: true };
-    }
-
     default:
       return {
         ok: false,
@@ -150,8 +165,12 @@ async function startAutomation(): Promise<RouterResponse> {
       error: { code: 4100, message: "Extension not configured" },
     };
   }
-  if (wallet.address === null) {
-    return { ok: false, error: { code: 4100, message: "Wallet locked" } };
+  const ready = await wallet.ready();
+  if (!ready || wallet.address === null) {
+    return {
+      ok: false,
+      error: { code: 4100, message: "Wallet has no private key — import one in Settings" },
+    };
   }
   if (directLoopRunning) {
     return { ok: true, note: "already running" };
@@ -172,9 +191,6 @@ async function startAutomation(): Promise<RouterResponse> {
         api: evoEvoApi,
         log,
         onEvent: (event) => {
-          // Best-effort notify the side panel. If it isn't open, the
-          // call rejects with "Receiving end does not exist" — that's
-          // fine, the loop just keeps going.
           void chrome.runtime
             .sendMessage({ type: "direct-event", event })
             .catch(() => undefined);
@@ -195,13 +211,8 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   });
 }
 
-// Click extension icon -> side panel opens (no popup). Side panel
-// persists across tab switches so the user sees status while working
-// elsewhere.
 if (typeof chrome !== "undefined" && chrome.sidePanel?.setPanelBehavior) {
   void chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
-    .catch(() => {
-      // Older Chromes may not support the API; ignore.
-    });
+    .catch(() => undefined);
 }

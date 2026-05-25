@@ -25,7 +25,6 @@ export type ExtensionConfig = {
   allowedFunctionSelectors: string[];
   maxFeeNative: number;
   dryRun: boolean;
-  idleLockMinutes: number;
   cooldownSeconds: number;
   // Stop automation when each feed tab has fewer than this many
   // unprocessed opinions left. Lets the user leave a buffer rather than

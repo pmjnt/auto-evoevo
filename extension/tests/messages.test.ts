@@ -12,9 +12,12 @@ describe("messages schema", () => {
     expect(parsed.type).toBe("rpc-request");
   });
 
-  it("parses a valid unlock", () => {
-    const parsed = parseMessage({ type: "unlock", password: "p" });
-    expect(parsed.type).toBe("unlock");
+  it("parses a valid set-private-key", () => {
+    const parsed = parseMessage({
+      type: "set-private-key",
+      privateKey: "0x" + "11".repeat(32),
+    });
+    expect(parsed.type).toBe("set-private-key");
   });
 
   it("parses a valid get-config request", () => {
@@ -26,7 +29,9 @@ describe("messages schema", () => {
     expect(() => parseMessage({ type: "bogus" })).toThrow();
   });
 
-  it("rejects a missing field", () => {
-    expect(() => parseMessage({ type: "unlock" })).toThrow();
+  it("rejects a malformed private key", () => {
+    expect(() =>
+      parseMessage({ type: "set-private-key", privateKey: "not-hex" }),
+    ).toThrow();
   });
 });

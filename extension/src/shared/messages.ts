@@ -19,12 +19,6 @@ export const rpcResponseSchema = z.object({
     .optional(),
 });
 
-export const unlockSchema = z.object({
-  type: z.literal("unlock"),
-  password: z.string().min(1),
-});
-
-export const lockSchema = z.object({ type: z.literal("lock") });
 export const getStatusSchema = z.object({ type: z.literal("get-status") });
 export const getConfigSchema = z.object({ type: z.literal("get-config") });
 
@@ -34,10 +28,15 @@ export const resumeSchema = z.object({ type: z.literal("resume") });
 export const startSchema = z.object({ type: z.literal("start") });
 export const stopSchema = z.object({ type: z.literal("stop") });
 
-export const importKeySchema = z.object({
-  type: z.literal("import-key"),
-  privateKey: z.string().regex(HEX),
-  password: z.string().min(8),
+// Store the private key as plaintext in chrome.storage.local. There is
+// no master password — distribution is controlled out-of-band.
+export const setPrivateKeySchema = z.object({
+  type: z.literal("set-private-key"),
+  privateKey: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
+});
+
+export const clearPrivateKeySchema = z.object({
+  type: z.literal("clear-private-key"),
 });
 
 export const setConfigSchema = z.object({
@@ -51,7 +50,6 @@ export const setConfigSchema = z.object({
     allowedFunctionSelectors: z.array(z.string().regex(HEX)),
     maxFeeNative: z.number().positive(),
     dryRun: z.boolean(),
-    idleLockMinutes: z.number().int().positive(),
     cooldownSeconds: z.number().int().min(0).max(300).default(0),
     stopAtRemaining: z.number().int().min(0).max(1000).default(10),
     agentId: z.number().int().min(0).default(0),
@@ -63,15 +61,14 @@ export const exportLogSchema = z.object({ type: z.literal("export-log") });
 export const messageSchema = z.discriminatedUnion("type", [
   rpcRequestSchema,
   rpcResponseSchema,
-  unlockSchema,
-  lockSchema,
   getStatusSchema,
   getConfigSchema,
   pauseSchema,
   resumeSchema,
   startSchema,
   stopSchema,
-  importKeySchema,
+  setPrivateKeySchema,
+  clearPrivateKeySchema,
   setConfigSchema,
   exportLogSchema,
   getAgentsSchema,

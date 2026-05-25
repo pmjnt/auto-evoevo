@@ -1,15 +1,8 @@
 import { z } from "zod";
 import type { ExtensionConfig } from "../shared/types.js";
-import type { Vault } from "../shared/crypto.js";
 
 const HEX = /^0x[0-9a-fA-F]*$/;
-
-const vaultSchema = z.object({
-  version: z.literal(1),
-  salt: z.string().min(1),
-  iv: z.string().min(1),
-  ciphertext: z.string().min(1),
-});
+const PRIVATE_KEY_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 
 const configSchema = z.object({
   allowedOrigin: z.string().url(),
@@ -20,21 +13,31 @@ const configSchema = z.object({
   allowedFunctionSelectors: z.array(z.string().regex(HEX)),
   maxFeeNative: z.number().positive(),
   dryRun: z.boolean(),
-  idleLockMinutes: z.number().int().positive(),
   cooldownSeconds: z.number().int().min(0).max(300).default(0),
   stopAtRemaining: z.number().int().min(0).max(1000).default(10),
   agentId: z.number().int().min(0).default(0),
 });
 
-export async function getVault(): Promise<Vault | null> {
-  const stored = await chrome.storage.local.get("vault");
-  const raw = (stored as Record<string, unknown>)["vault"];
-  if (raw == null) return null;
-  return vaultSchema.parse(raw) as Vault;
+// Private key stored as plaintext in chrome.storage.local. No vault, no
+// password. Anyone with access to the Chrome profile can read it; the
+// design assumes one burner wallet per recipient and OOB key handoff.
+export async function getPrivateKey(): Promise<string | null> {
+  const stored = await chrome.storage.local.get("privateKey");
+  const raw = (stored as Record<string, unknown>)["privateKey"];
+  if (typeof raw !== "string") return null;
+  if (!PRIVATE_KEY_PATTERN.test(raw)) return null;
+  return raw;
 }
 
-export async function setVault(vault: Vault): Promise<void> {
-  await chrome.storage.local.set({ vault });
+export async function setPrivateKey(privateKey: string): Promise<void> {
+  if (!PRIVATE_KEY_PATTERN.test(privateKey)) {
+    throw new Error("Invalid private key — expected 0x + 64 hex");
+  }
+  await chrome.storage.local.set({ privateKey });
+}
+
+export async function clearPrivateKey(): Promise<void> {
+  await chrome.storage.local.remove("privateKey");
 }
 
 export async function getConfig(): Promise<ExtensionConfig | null> {

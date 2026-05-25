@@ -1,51 +1,31 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
-import { encryptVault } from "../src/shared/crypto.js";
-import { setVault } from "../src/background/storage.js";
+import { setPrivateKey } from "../src/background/storage.js";
 import { Wallet } from "../src/background/wallet.js";
 
-const TEST_KEY = "0x" + "11".repeat(32); // ethers-valid 32-byte key
+const TEST_KEY = "0x" + "11".repeat(32);
 
-describe("wallet", () => {
-  beforeEach(async () => {
+describe("wallet (no password)", () => {
+  beforeEach(() => {
     installFakeChromeApi();
-    const vault = await encryptVault(TEST_KEY, "password-123");
-    await setVault(vault);
   });
 
-  it("starts locked", async () => {
+  it("is not ready when no key is stored", async () => {
     const wallet = new Wallet();
+    expect(await wallet.ready()).toBe(false);
     expect(wallet.address).toBeNull();
-    await expect(
-      wallet.signTransaction({
-        to: "0x" + "ab".repeat(20),
-        data: "0xd0e30db0",
-        value: 0n,
-        nonce: 0,
-        gasLimit: 21000n,
-        gasPrice: 1n,
-        chainId: 16661,
-      }),
-    ).rejects.toThrow(/locked/i);
   });
 
-  it("unlocks with correct password and exposes address", async () => {
+  it("loads the stored key on ready()", async () => {
+    await setPrivateKey(TEST_KEY);
     const wallet = new Wallet();
-    const result = await wallet.unlock("password-123");
-    expect(result.ok).toBe(true);
+    expect(await wallet.ready()).toBe(true);
     expect(wallet.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
 
-  it("returns ok:false on wrong password and stays locked", async () => {
+  it("signs a transaction once a key is stored", async () => {
+    await setPrivateKey(TEST_KEY);
     const wallet = new Wallet();
-    const result = await wallet.unlock("wrong");
-    expect(result.ok).toBe(false);
-    expect(wallet.address).toBeNull();
-  });
-
-  it("signs a transaction once unlocked", async () => {
-    const wallet = new Wallet();
-    await wallet.unlock("password-123");
     const signed = await wallet.signTransaction({
       to: "0x" + "ab".repeat(20),
       data: "0xd0e30db0",
@@ -58,11 +38,8 @@ describe("wallet", () => {
     expect(signed).toMatch(/^0x[0-9a-fA-F]+$/);
   });
 
-  it("locks again after lock() and rejects subsequent sign", async () => {
+  it("rejects sign attempts before a key is stored", async () => {
     const wallet = new Wallet();
-    await wallet.unlock("password-123");
-    wallet.lock();
-    expect(wallet.address).toBeNull();
     await expect(
       wallet.signTransaction({
         to: "0x" + "ab".repeat(20),
@@ -73,24 +50,14 @@ describe("wallet", () => {
         gasPrice: 1n,
         chainId: 16661,
       }),
-    ).rejects.toThrow(/locked/i);
-  });
-});
-
-describe("wallet idle-lock", () => {
-  beforeEach(async () => {
-    installFakeChromeApi();
-    const vault = await encryptVault(TEST_KEY, "password-123");
-    await setVault(vault);
+    ).rejects.toThrow(/no private key/i);
   });
 
-  it("locks itself after the idle timeout elapses", async () => {
-    vi.useFakeTimers();
-    const wallet = new Wallet({ idleLockMinutes: 1 });
-    await wallet.unlock("password-123");
-    expect(wallet.address).not.toBeNull();
-    vi.advanceTimersByTime(60_000);
-    expect(wallet.address).toBeNull();
-    vi.useRealTimers();
+  it("reload() picks up a newly-stored key without making a new wallet", async () => {
+    const wallet = new Wallet();
+    expect(await wallet.ready()).toBe(false);
+    await setPrivateKey(TEST_KEY);
+    await wallet.reload();
+    expect(wallet.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
 });

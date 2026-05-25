@@ -228,18 +228,22 @@
     </header>
 
     <div class="body">
-      <!-- LOCKED VIEW -->
-      <section id="locked" class="active">
-        <label for="password">Master password</label>
-        <input id="password" class="input" type="password" autocomplete="current-password" />
+      <!-- SETUP VIEW (shown when no private key is loaded) -->
+      <section id="setup">
+        <label for="setupPrivateKey">Private key</label>
+        <input id="setupPrivateKey" class="input" type="password" placeholder="0x..." autocomplete="off" />
         <div class="row">
-          <button id="unlock" class="btn">Unlock</button>
+          <button id="saveKey" class="btn">Save key</button>
         </div>
-        <div id="unlock-error" class="msg err"></div>
+        <div id="setup-msg" class="msg"></div>
+        <div class="msg" style="margin-top:14px;font-size:11px;line-height:1.5;color:var(--muted)">
+          The key is stored as plaintext in this Chrome profile's storage.
+          No password gate. Use a burner wallet only.
+        </div>
       </section>
 
-      <!-- UNLOCKED VIEW: status + config -->
-      <section id="unlocked">
+      <!-- READY VIEW: status + config -->
+      <section id="ready">
         <div class="address" id="address"></div>
         <div class="stats">
           <div class="stat"><span>Status</span><strong id="status-text">idle</strong></div>
@@ -250,7 +254,6 @@
           <div class="stat"><span>Reverted</span><strong id="reverted">0</strong></div>
         </div>
         <div class="row">
-          <button id="lock" class="btn ghost">Lock</button>
           <button id="pause" class="btn ghost">Pause</button>
           <button id="start" class="btn">Start</button>
         </div>
@@ -337,25 +340,17 @@
               <input id="stopAtRemaining" class="input" type="number" min="0" max="1000" />
             </div>
           </div>
-          <div class="field">
-            <label for="idleLockMinutes">Idle lock (minutes)</label>
-            <input id="idleLockMinutes" class="input" type="number" min="1" />
-          </div>
         </div>
 
-        <!-- VAULT -->
+        <!-- WALLET -->
         <div class="config-section">
-          <h3>Vault</h3>
+          <h3>Wallet</h3>
           <div class="field">
-            <div class="field-label">
-              <label for="privateKey">Private key</label>
-              <span class="hint">cleared on save</span>
-            </div>
-            <input id="privateKey" class="input" type="password" />
+            <label>Address</label>
+            <input id="walletAddress" class="input" type="text" readonly />
           </div>
-          <div class="field">
-            <label for="vaultPassword">Master password</label>
-            <input id="vaultPassword" class="input" type="password" />
+          <div class="row">
+            <button id="clearKey" class="btn ghost small">Remove key</button>
           </div>
         </div>
 
