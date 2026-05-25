@@ -3,6 +3,46 @@ import { runAutomation, type Outcome } from "./automation.js";
 const SOURCE_PAGE = "auto-evoevo-page";
 const SOURCE_EXT = "auto-evoevo-ext";
 
+// A 1-second silent WAV. Played in a loop while automation runs so the
+// tab is considered "audible" by Chrome, which disables background
+// timer throttling. Without this, switching to another tab while the
+// loop is running slows setTimeout to ~1s, breaking the receipt wait
+// and cooldown timing.
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
+let keepAliveAudio: HTMLAudioElement | null = null;
+
+function keepTabActive(): void {
+  if (keepAliveAudio !== null) return;
+  try {
+    const audio = new Audio(SILENT_WAV);
+    audio.loop = true;
+    audio.volume = 0.001; // basically inaudible but not muted (muted may still be throttled)
+    void audio.play().catch(() => {
+      // Browser may block autoplay without a user gesture on the page
+      // itself; the request came from the popup so the page does not
+      // have a user activation. Automation still works but the tab
+      // will be throttled when backgrounded — the user can click
+      // anywhere on the page once to grant a gesture, then re-Start.
+    });
+    keepAliveAudio = audio;
+  } catch {
+    keepAliveAudio = null;
+  }
+}
+
+function stopKeepingTabActive(): void {
+  if (keepAliveAudio === null) return;
+  try {
+    keepAliveAudio.pause();
+    keepAliveAudio.src = "";
+  } catch {
+    // ignore
+  }
+  keepAliveAudio = null;
+}
+
 const outcomeQueue: Outcome[] = [];
 const outcomeWaiters: Array<(value: Outcome) => void> = [];
 
@@ -69,6 +109,7 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
       typeof value.stopAtRemaining === "number" && value.stopAtRemaining >= 0
         ? value.stopAtRemaining
         : 0;
+    keepTabActive(); // prevent Chrome from throttling the tab when it is hidden
     void runAutomation({
       nextOutcome,
       cooldownMs,
@@ -76,6 +117,7 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
       onEvent: (event) => chrome.runtime.sendMessage({ type: "automation-event", event }),
     }).finally(() => {
       automationRunning = false;
+      stopKeepingTabActive();
     });
     return;
   }
