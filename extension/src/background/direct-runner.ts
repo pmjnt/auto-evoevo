@@ -115,6 +115,7 @@ export async function runDirect(deps: DirectRunnerDeps): Promise<void> {
         tab,
         chainId: deps.config.chainId,
         agentId: deps.config.agentId,
+        limit: 100,
       });
     } catch (error) {
       if (error instanceof EvoEvoAuthError) {

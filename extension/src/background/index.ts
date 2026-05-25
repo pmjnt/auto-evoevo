@@ -5,12 +5,34 @@ import { RpcClient } from "./rpc.js";
 import { SessionLog } from "./session-log.js";
 import { runPipeline } from "./pipeline.js";
 import { EvoEvoApiClient } from "./evoevo-api.js";
+import type { SiweAuth } from "./siwe.js";
 import { runDirect } from "./direct-runner.js";
 
 const wallet = new Wallet();
 const log = new SessionLog();
 let paused = false;
-const evoEvoApi = new EvoEvoApiClient();
+
+// Persist the SIWE token across service-worker restarts. Lives in
+// chrome.storage.session so it is cleared when the user closes Chrome
+// entirely but survives the worker idling out.
+const SESSION_AUTH_KEY = "evoevo-auth";
+const evoEvoApi = new EvoEvoApiClient({
+  tokenStorage: {
+    load: async (): Promise<SiweAuth | null> => {
+      if (typeof chrome === "undefined" || !chrome.storage?.session?.get) return null;
+      const stored = (await chrome.storage.session.get(SESSION_AUTH_KEY)) as Record<string, SiweAuth | undefined>;
+      return stored[SESSION_AUTH_KEY] ?? null;
+    },
+    save: async (auth) => {
+      if (typeof chrome === "undefined" || !chrome.storage?.session?.set) return;
+      await chrome.storage.session.set({ [SESSION_AUTH_KEY]: auth });
+    },
+    clear: async () => {
+      if (typeof chrome === "undefined" || !chrome.storage?.session?.remove) return;
+      await chrome.storage.session.remove(SESSION_AUTH_KEY);
+    },
+  },
+});
 let directLoopRunning = false;
 
 const READ_ONLY_METHODS = new Set([
@@ -67,9 +89,40 @@ export async function handleMessage(
 
     case "lock": {
       wallet.lock();
-      evoEvoApi.clearAuth();
+      await evoEvoApi.clearAuth();
       await broadcastWalletEventToEvoEvoTabs("accountsChanged", []);
       return { ok: true };
+    }
+
+    case "get-agents": {
+      if (wallet.address === null) {
+        return { ok: false, error: { code: 4100, message: "Wallet locked" } };
+      }
+      const config = await getConfig();
+      if (config === null) {
+        return {
+          ok: false,
+          error: { code: 4100, message: "Extension not configured" },
+        };
+      }
+      try {
+        await evoEvoApi.ensureAuth(wallet.address, (msg) =>
+          wallet.signMessage(msg),
+        );
+        const agents = await evoEvoApi.listAgents(
+          wallet.address,
+          config.chainId,
+        );
+        return { ok: true, agents };
+      } catch (error) {
+        return {
+          ok: false,
+          error: {
+            code: -32603,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        };
+      }
     }
 
     case "get-status": {

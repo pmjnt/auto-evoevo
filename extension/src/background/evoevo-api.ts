@@ -60,19 +60,31 @@ export type FromOpinionResponse = {
   token_id: string;
 };
 
+// Allows the EvoEvoApiClient to persist its JWT outside of instance
+// memory. Production wires this to chrome.storage.session so the token
+// survives service-worker restarts but is cleared when Chrome closes.
+export type TokenStorage = {
+  load: () => Promise<SiweAuth | null>;
+  save: (auth: SiweAuth) => Promise<void>;
+  clear: () => Promise<void>;
+};
+
 export type ApiOptions = {
   baseUrl?: string;
   fetchFn?: typeof fetch;
+  tokenStorage?: TokenStorage;
 };
 
 export class EvoEvoApiClient {
   private auth: SiweAuth | null = null;
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
+  private readonly tokenStorage: TokenStorage | null;
 
   constructor(options: ApiOptions = {}) {
     this.baseUrl = options.baseUrl ?? DEFAULT_BASE;
     this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
+    this.tokenStorage = options.tokenStorage ?? null;
   }
 
   isAuthed(): boolean {
@@ -86,15 +98,31 @@ export class EvoEvoApiClient {
     address: string,
     signMessage: (message: string) => Promise<string>,
   ): Promise<void> {
+    // Rehydrate from persistent storage if we don't have a live token.
+    // Lets the loop survive a service-worker restart without forcing
+    // the user to unlock + re-sign the SIWE message.
+    if (this.auth === null && this.tokenStorage !== null) {
+      const stored = await this.tokenStorage.load();
+      if (stored !== null && stored.address.toLowerCase() === address.toLowerCase()) {
+        this.auth = stored;
+      }
+    }
     if (this.isAuthed()) return;
+
     this.auth = await siweLogin(address, signMessage, {
       baseUrl: this.baseUrl,
       fetchFn: this.fetchFn,
     });
+    if (this.tokenStorage !== null) {
+      await this.tokenStorage.save(this.auth);
+    }
   }
 
-  clearAuth(): void {
+  async clearAuth(): Promise<void> {
     this.auth = null;
+    if (this.tokenStorage !== null) {
+      await this.tokenStorage.clear();
+    }
   }
 
   // GET /v1/agents?wallet_address=...&chain_id=...
@@ -155,7 +183,7 @@ export class EvoEvoApiClient {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (response.status === 401) {
-      this.auth = null;
+      await this.clearAuth();
       throw new EvoEvoAuthError(`Unauthorized: ${url}`);
     }
     if (!response.ok) {

@@ -27,6 +27,8 @@ export const unlockSchema = z.object({
 export const lockSchema = z.object({ type: z.literal("lock") });
 export const getStatusSchema = z.object({ type: z.literal("get-status") });
 export const getConfigSchema = z.object({ type: z.literal("get-config") });
+
+export const getAgentsSchema = z.object({ type: z.literal("get-agents") });
 export const pauseSchema = z.object({ type: z.literal("pause") });
 export const resumeSchema = z.object({ type: z.literal("resume") });
 export const startSchema = z.object({ type: z.literal("start") });
@@ -73,6 +75,7 @@ export const messageSchema = z.discriminatedUnion("type", [
   importKeySchema,
   setConfigSchema,
   exportLogSchema,
+  getAgentsSchema,
 ]);
 
 export type Message = z.infer<typeof messageSchema>;

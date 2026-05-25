@@ -49,10 +49,54 @@ function fillConfig(config: ExtensionConfig): void {
   setValue("idleLockMinutes", config.idleLockMinutes);
   setValue("cooldownSeconds", config.cooldownSeconds);
   setValue("stopAtRemaining", config.stopAtRemaining);
-  setValue("agentId", config.agentId);
   setChecked("dryRun", config.dryRun);
   const modeEl = document.getElementById("runMode") as HTMLSelectElement | null;
   if (modeEl) modeEl.value = config.runMode;
+  // Seed the dropdown with at least the saved value so it doesn't read
+  // 0 before we fetch the live agent list.
+  const agentSelect = document.getElementById("agentId") as HTMLSelectElement | null;
+  if (agentSelect && config.agentId > 0) {
+    agentSelect.innerHTML = `<option value="${config.agentId}">Saved: ${config.agentId} (refresh to verify)</option>`;
+    agentSelect.value = String(config.agentId);
+  }
+}
+
+type AgentSummary = {
+  id: number;
+  name: string;
+  onchain_identity: { identity_agent_id?: string } | null;
+};
+
+async function loadAgents(): Promise<void> {
+  const select = document.getElementById("agentId") as HTMLSelectElement | null;
+  if (!select) return;
+  const savedValue = select.value;
+  select.innerHTML = '<option value="0">Loading…</option>';
+  const response = (await send({ type: "get-agents" })) as {
+    ok: boolean;
+    agents?: AgentSummary[];
+    error?: { message: string };
+  };
+  if (!response.ok || !response.agents) {
+    select.innerHTML = `<option value="0">Failed: ${response.error?.message ?? "unknown"}</option>`;
+    return;
+  }
+  const agents = response.agents;
+  if (agents.length === 0) {
+    select.innerHTML = '<option value="0">No agents for this wallet on this chain</option>';
+    return;
+  }
+  select.innerHTML = agents
+    .map((a) => {
+      const onchain = a.onchain_identity?.identity_agent_id;
+      const label = `#${a.id} ${a.name}` + (onchain ? ` (token ${onchain})` : "");
+      return `<option value="${a.id}">${label}</option>`;
+    })
+    .join("");
+  // Restore previous selection if present in the new list, else first.
+  if (agents.some((a) => String(a.id) === savedValue)) {
+    select.value = savedValue;
+  }
 }
 
 async function loadConfig(): Promise<void> {
@@ -68,6 +112,11 @@ async function loadConfig(): Promise<void> {
 }
 
 void loadConfig();
+
+document.getElementById("loadAgents")?.addEventListener("click", (event) => {
+  event.preventDefault();
+  void loadAgents();
+});
 
 document.getElementById("save")?.addEventListener("click", async () => {
   const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;

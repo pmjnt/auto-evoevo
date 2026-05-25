@@ -312,8 +312,13 @@
             </select>
           </div>
           <div class="field">
-            <label class="field-label" for="agentId"><span>Active agent id</span><span class="hint">direct mode only</span></label>
-            <input id="agentId" type="number" min="0" placeholder="e.g. 8359" />
+            <label class="field-label" for="agentId">
+              <span>Active agent</span>
+              <span class="hint"><a href="#" id="loadAgents" style="color:var(--orange);text-decoration:none">Refresh</a></span>
+            </label>
+            <select id="agentId" style="width:100%;height:38px;padding:9px 11px;background:var(--field);border:1px solid var(--border);color:var(--text);border-radius:7px;font:650 13px/1.2 ui-monospace, monospace;">
+              <option value="0">— Unlock + Refresh to load list —</option>
+            </select>
           </div>
         </div>
       </section>
