@@ -171,8 +171,14 @@ async function startAutomation(): Promise<RouterResponse> {
         rpc,
         api: evoEvoApi,
         log,
-        onEvent: (event) =>
-          chrome.runtime.sendMessage({ type: "direct-event", event }),
+        onEvent: (event) => {
+          // Best-effort notify the side panel. If it isn't open, the
+          // call rejects with "Receiving end does not exist" — that's
+          // fine, the loop just keeps going.
+          void chrome.runtime
+            .sendMessage({ type: "direct-event", event })
+            .catch(() => undefined);
+        },
         isPaused: () => paused,
       });
     } finally {
