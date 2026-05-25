@@ -24,9 +24,12 @@ export async function siweLogin(
 
   const lowerAddress = address.toLowerCase();
 
+  // Note: the Origin header is overridden by declarativeNetRequest
+  // (see rules.json) so EvoEvo's CORS check sees https://evoevo.ai
+  // instead of the chrome-extension://... runtime origin.
   const nonceResponse = await fetchFn(`${baseUrl}/v1/auth/nonce`, {
     method: "POST",
-    headers: { "content-type": "application/json", origin: "https://evoevo.ai" },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ address: lowerAddress }),
   });
   if (!nonceResponse.ok) {
@@ -44,7 +47,7 @@ export async function siweLogin(
 
   const loginResponse = await fetchFn(`${baseUrl}/v1/auth/login`, {
     method: "POST",
-    headers: { "content-type": "application/json", origin: "https://evoevo.ai" },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       address: lowerAddress,
       nonce: nonceBody.nonce,

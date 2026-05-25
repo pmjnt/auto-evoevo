@@ -178,7 +178,6 @@ export class EvoEvoApiClient {
         accept: "*/*",
         "content-type": "application/json",
         authorization: `Bearer ${this.auth.token}`,
-        origin: "https://evoevo.ai",
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

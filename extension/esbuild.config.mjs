@@ -24,6 +24,7 @@ await Promise.all([
 copyFileSync("src/ui/popup.html", "dist/popup.html");
 copyFileSync("src/ui/options.html", "dist/options.html");
 copyFileSync("manifest.json", "dist/manifest.json");
+copyFileSync("rules.json", "dist/rules.json");
 cpSync("src/assets/icons", "dist/icons", { recursive: true });
 
 console.log("Built dist/");
