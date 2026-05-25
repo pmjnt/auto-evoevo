@@ -23,6 +23,8 @@ const fakeConfig: ExtensionConfig = {
   idleLockMinutes: 30,
   cooldownSeconds: 0,
   stopAtRemaining: 0,
+  runMode: "dom",
+  agentId: 0,
 };
 
 describe("storage", () => {

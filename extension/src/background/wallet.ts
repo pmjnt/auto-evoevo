@@ -76,4 +76,14 @@ export class Wallet {
       chainId: tx.chainId,
     });
   }
+
+  // Sign an arbitrary message via personal_sign / EIP-191. Needed for
+  // the SIWE login flow against EvoEvo's REST API.
+  async signMessage(message: string): Promise<string> {
+    if (this.signer === null) {
+      throw new Error("Wallet is locked");
+    }
+    this.armIdleTimer();
+    return await this.signer.signMessage(message);
+  }
 }

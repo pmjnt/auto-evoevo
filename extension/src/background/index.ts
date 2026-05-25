@@ -4,10 +4,14 @@ import { Wallet } from "./wallet.js";
 import { RpcClient } from "./rpc.js";
 import { SessionLog } from "./session-log.js";
 import { runPipeline } from "./pipeline.js";
+import { EvoEvoApiClient } from "./evoevo-api.js";
+import { runDirect } from "./direct-runner.js";
 
 const wallet = new Wallet();
 const log = new SessionLog();
 let paused = false;
+const evoEvoApi = new EvoEvoApiClient();
+let directLoopRunning = false;
 
 const READ_ONLY_METHODS = new Set([
   "eth_blockNumber",
@@ -63,6 +67,7 @@ export async function handleMessage(
 
     case "lock": {
       wallet.lock();
+      evoEvoApi.clearAuth();
       await broadcastWalletEventToEvoEvoTabs("accountsChanged", []);
       return { ok: true };
     }
@@ -86,16 +91,12 @@ export async function handleMessage(
 
     case "resume": {
       paused = false;
-      const settings = await currentAutomationSettings();
-      const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
-      return { ok: true, tabsNotified };
+      return await startAutomation();
     }
 
     case "start": {
       paused = false;
-      const settings = await currentAutomationSettings();
-      const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
-      return { ok: true, tabsNotified };
+      return await startAutomation();
     }
 
     case "stop":
@@ -244,6 +245,52 @@ async function currentAutomationSettings(): Promise<AutomationSettings> {
     cooldownMs: Math.max(0, (config?.cooldownSeconds ?? 0) * 1000),
     stopAtRemaining: Math.max(0, config?.stopAtRemaining ?? 0),
   };
+}
+
+async function startAutomation(): Promise<RouterResponse> {
+  const config = await getConfig();
+  if (config === null) {
+    return {
+      ok: false,
+      error: { code: 4100, message: "Extension not configured" },
+    };
+  }
+
+  if (config.runMode === "direct") {
+    if (wallet.address === null) {
+      return { ok: false, error: { code: 4100, message: "Wallet locked" } };
+    }
+    if (directLoopRunning) {
+      return { ok: true, mode: "direct", note: "already running" };
+    }
+    directLoopRunning = true;
+    void (async () => {
+      try {
+        const rpc = new RpcClient(config.rpcUrl);
+        await runDirect({
+          config,
+          wallet: {
+            address: wallet.address,
+            signMessage: (msg) => wallet.signMessage(msg),
+            signTransaction: (tx) => wallet.signTransaction(tx),
+          },
+          rpc,
+          api: evoEvoApi,
+          log,
+          onEvent: (event) =>
+            chrome.runtime.sendMessage({ type: "direct-event", event }),
+          isPaused: () => paused,
+        });
+      } finally {
+        directLoopRunning = false;
+      }
+    })();
+    return { ok: true, mode: "direct", started: true };
+  }
+
+  const settings = await currentAutomationSettings();
+  const tabsNotified = await broadcastStartToEvoEvoTabs(settings);
+  return { ok: true, mode: "dom", tabsNotified };
 }
 
 async function broadcastWalletEventToEvoEvoTabs(

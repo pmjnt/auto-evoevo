@@ -298,6 +298,26 @@
         </div>
       </section>
 
+      <section class="section">
+        <div class="section-head">
+          <h2>Run Mode</h2>
+          <span class="section-note">how the loop runs</span>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="field-label" for="runMode"><span>Mode</span><span class="hint">dom needs the tab, direct does not</span></label>
+            <select id="runMode" style="width:100%;height:38px;padding:9px 11px;background:var(--field);border:1px solid var(--border);color:var(--text);border-radius:7px;font:650 13px/1.2 ui-monospace, monospace;">
+              <option value="dom">DOM click (existing — needs evoevo.ai tab)</option>
+              <option value="direct">Direct API + contract (no tab needed)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="agentId"><span>Active agent id</span><span class="hint">direct mode only</span></label>
+            <input id="agentId" type="number" min="0" placeholder="e.g. 8359" />
+          </div>
+        </div>
+      </section>
+
       <label class="switch" for="dryRun">
         <span>
           <strong>Dry-run mode</strong>
