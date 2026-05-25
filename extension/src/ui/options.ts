@@ -13,7 +13,6 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   idleLockMinutes: 30,
   cooldownSeconds: 3,
   stopAtRemaining: 10,
-  runMode: "dom",
   agentId: 0,
 };
 
@@ -50,8 +49,6 @@ function fillConfig(config: ExtensionConfig): void {
   setValue("cooldownSeconds", config.cooldownSeconds);
   setValue("stopAtRemaining", config.stopAtRemaining);
   setChecked("dryRun", config.dryRun);
-  const modeEl = document.getElementById("runMode") as HTMLSelectElement | null;
-  if (modeEl) modeEl.value = config.runMode;
   // Seed the dropdown with at least the saved value so it doesn't read
   // 0 before we fetch the live agent list.
   const agentSelect = document.getElementById("agentId") as HTMLSelectElement | null;
@@ -132,10 +129,6 @@ document.getElementById("save")?.addEventListener("click", async () => {
     idleLockMinutes: Number(value("idleLockMinutes", "30")) || 30,
     cooldownSeconds: Math.max(0, Math.min(300, Number(value("cooldownSeconds")) || 0)),
     stopAtRemaining: Math.max(0, Math.min(1000, Number(value("stopAtRemaining")) || 0)),
-    runMode: ((): "dom" | "direct" => {
-      const v = (document.getElementById("runMode") as HTMLSelectElement | null)?.value;
-      return v === "direct" ? "direct" : "dom";
-    })(),
     agentId: Math.max(0, Number(value("agentId")) || 0),
   };
 

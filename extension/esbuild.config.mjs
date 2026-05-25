@@ -17,8 +17,6 @@ const shared = { bundle: true, format: "iife", target: "chrome120", minify: fals
 
 await Promise.all([
   build({ ...shared, entryPoints: ["src/background/index.ts"], outfile: "dist/background.js" }),
-  build({ ...shared, entryPoints: ["src/content/index.ts"], outfile: "dist/content.js" }),
-  build({ ...shared, entryPoints: ["src/inpage/entry.ts"], outfile: "dist/inpage.js" }),
   build({ ...shared, entryPoints: ["src/ui/popup.ts"], outfile: "dist/popup.js" }),
   build({ ...shared, entryPoints: ["src/ui/options.ts"], outfile: "dist/options.js" }),
 ]);

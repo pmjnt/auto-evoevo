@@ -27,15 +27,12 @@ export type ExtensionConfig = {
   dryRun: boolean;
   idleLockMinutes: number;
   cooldownSeconds: number;
-  // Stop automation when fewer than this many unprocessed ADD TO MEMORY
-  // buttons remain visible AND there is no SHOW MORE button to load more.
+  // Stop automation when each feed tab has fewer than this many
+  // unprocessed opinions left. Lets the user leave a buffer rather than
+  // draining the feed completely.
   stopAtRemaining: number;
-  // "dom"    = automate by clicking ADD TO MEMORY buttons on evoevo.ai
-  // "direct" = skip the page entirely, call EvoEvo's REST API + contract
-  //            directly from the service worker
-  runMode: "dom" | "direct";
-  // Agent id to operate as in direct mode. Single value because all
-  // submissions share one wallet identity. 0 = unset.
+  // Agent id whose feed we automate. All submissions go through this
+  // agent. 0 = unset, automation refuses to start.
   agentId: number;
 };
 

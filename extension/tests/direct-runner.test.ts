@@ -22,7 +22,6 @@ const baseConfig: ExtensionConfig = {
   idleLockMinutes: 30,
   cooldownSeconds: 0,
   stopAtRemaining: 0,
-  runMode: "direct",
   agentId: 8359,
 };
 
