@@ -20,6 +20,7 @@ describe("manifest.json", () => {
       expect.arrayContaining([
         "storage",
         "sidePanel",
+        "alarms",
         "declarativeNetRequestWithHostAccess",
       ]),
     );
