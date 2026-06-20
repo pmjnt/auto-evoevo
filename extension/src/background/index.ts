@@ -120,6 +120,7 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
       submitPrediction: async (_sourceAgentId, agentId, prediction) => {
         const prepared = await preparePredictionIntake({
           api: evoEvoApi,
+          config,
           log,
           sourceAgentId: _sourceAgentId,
           targetAgentId: agentId,
@@ -127,6 +128,7 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
           opinionId: prediction.opinionId,
         });
         if (prepared.kind === "already_adopted") return prepared;
+        if (prepared.kind === "rate_limited") return prepared;
         return await submitIntake(prepared.memory.reasoning_intake_with_sig, {
           config: { ...config, agentId },
           wallet: {

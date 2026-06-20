@@ -186,6 +186,8 @@ async function processSource(
             ...context,
           },
         });
+      } else if (outcome.kind === "rate_limited") {
+        return await reportRateLimit(deps, outcome.retryAfterMs);
       } else if (outcome.kind === "dry_run") {
         continue;
       } else if (outcome.kind === "ambiguous") {
@@ -289,6 +291,8 @@ async function processDueRetries(deps: PredictionsRunnerDeps): Promise<RunnerRes
           ...context,
         },
       });
+    } else if (outcome.kind === "rate_limited") {
+      return await reportRateLimit(deps, outcome.retryAfterMs);
     } else if (outcome.kind === "ambiguous") {
       await deps.registry.block(item.predictionId);
       await deps.onProgress({
@@ -327,6 +331,16 @@ async function processDueRetries(deps: PredictionsRunnerDeps): Promise<RunnerRes
     }
   }
   return { kind: "completed" };
+}
+
+async function reportRateLimit(
+  deps: PredictionsRunnerDeps,
+  retryAfterMs: number,
+): Promise<RunnerResult> {
+  await deps.onProgress({
+    activity: { type: "predictions-rate-limited", retryAfterMs },
+  });
+  return { kind: "rate_limited", retryAfterMs };
 }
 
 function assertFreshPage<T>(

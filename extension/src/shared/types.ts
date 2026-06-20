@@ -48,6 +48,7 @@ export type FeedTabName = "recommended" | "weekly" | "monthly" | "all_time";
 export type PredictionActivityEvent =
   | { type: "predictions-loading" }
   | { type: "predictions-sources"; count: number }
+  | { type: "predictions-rate-limited"; retryAfterMs: number }
   | {
       type: "prediction";
       phase: "submitting" | "confirmed" | "already_adopted" | "skipped" | "failed";

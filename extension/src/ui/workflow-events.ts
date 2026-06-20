@@ -5,6 +5,11 @@ export function formatWorkflowEvent(event: Record<string, unknown>): string | nu
   if (event.type === "predictions-sources") {
     return `[Predictions] Found ${String(event.count)} source agents`;
   }
+  if (event.type === "predictions-rate-limited") {
+    const typed = event as PredictionActivityEvent & { type: "predictions-rate-limited" };
+    const minutes = Math.max(1, Math.ceil(typed.retryAfterMs / 60_000));
+    return `[Predictions] Rate limited. Retrying in ${minutes} minutes.`;
+  }
   if (event.type === "prediction") {
     const typed = event as PredictionActivityEvent & { type: "prediction" };
     const prefix = `[Predictions] Source ${typed.sourceAgentId} - Prediction ${typed.predictionId}`;

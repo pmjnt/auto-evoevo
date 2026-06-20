@@ -184,6 +184,27 @@ describe("Predictions runner", () => {
     }));
   });
 
+  it("returns rate_limited when prediction submission hits a memory API limit", async () => {
+    const setup = harness();
+    setup.predictionPages.set(3314, [
+      page([prediction("limited", 1)], null),
+    ]);
+    const updates: PredictionProgressUpdate[] = [];
+    setup.deps.onProgress = vi.fn(async (update) => { updates.push(update); });
+    setup.deps.submitPrediction = vi.fn(async () => ({
+      kind: "rate_limited" as const,
+      retryAfterMs: 900_000,
+    }));
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "rate_limited", retryAfterMs: 900_000 });
+
+    expect(updates).toContainEqual({
+      activity: { type: "predictions-rate-limited", retryAfterMs: 900_000 },
+    });
+  });
+
   it("skips predictions already intaken by the viewer without submitting", async () => {
     const setup = harness();
     setup.predictionPages.set(3314, [

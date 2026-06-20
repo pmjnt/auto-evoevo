@@ -28,5 +28,9 @@ describe("formatWorkflowEvent", () => {
     })).toBe(
       "[Predictions] Source 60062 - Prediction 852 - Confirmed - 0x1234567890...",
     );
+    expect(formatWorkflowEvent({
+      type: "predictions-rate-limited",
+      retryAfterMs: 900_000,
+    })).toBe("[Predictions] Rate limited. Retrying in 15 minutes.");
   });
 });

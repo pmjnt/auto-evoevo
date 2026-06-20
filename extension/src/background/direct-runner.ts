@@ -61,6 +61,7 @@ export type DirectRunnerDeps = {
 export type RunnerResult =
   | { kind: "completed" }
   | { kind: "paused" }
+  | { kind: "rate_limited"; retryAfterMs: number }
   | { kind: "failed"; reason: string; global: boolean };
 
 export async function runDirect(deps: DirectRunnerDeps): Promise<void> {
