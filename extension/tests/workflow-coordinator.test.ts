@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
 import { DEFAULT_WORKFLOW_STATE, getWorkflowState, setWorkflowState } from "../src/background/storage.js";
-import { WorkflowCoordinator } from "../src/background/workflow-coordinator.js";
+import { WORKFLOW_ALARM_NAME, WorkflowCoordinator } from "../src/background/workflow-coordinator.js";
 import type { ExtensionConfig } from "../src/shared/types.js";
 
 const config: ExtensionConfig = {
@@ -15,6 +15,8 @@ const config: ExtensionConfig = {
   gasPriceJitterPercent: 0,
   dryRun: true,
   cooldownSeconds: 0,
+  memoryApiCooldownSeconds: 1,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 900,
   repeatIntervalMinutes: 120,
@@ -90,6 +92,25 @@ describe("WorkflowCoordinator", () => {
 
     expect((await getWorkflowState()).status).toBe("paused");
     expect(await chrome.alarms.get("workflow-cycle")).toBeUndefined();
+  });
+
+  it("schedules a long backoff after predictions rate limits", async () => {
+    const setup = coordinator({
+      runPredictions: async () => ({ kind: "rate_limited", retryAfterMs: 900_000 }),
+      now: () => 1_000_000,
+    });
+
+    await setup.value.start("predictions");
+    await setup.value.idle();
+
+    expect(await getWorkflowState()).toMatchObject({
+      status: "running",
+      activeWorkflow: null,
+      nextRunAt: 1_900_000,
+    });
+    expect(await chrome.alarms.get(WORKFLOW_ALARM_NAME)).toMatchObject({
+      scheduledTime: 1_900_000,
+    });
   });
 
   it("recover does not resume a user-paused workflow", async () => {

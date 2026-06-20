@@ -129,6 +129,10 @@ export class WorkflowCoordinator {
         await this.pauseWithError(result.reason);
         return;
       }
+      if (result.kind === "rate_limited") {
+        await this.scheduleRateLimitBackoff(result.retryAfterMs);
+        return;
+      }
       state = await this.deps.getState();
       if (scan === "full") state.lastReconciliationAt = this.now();
       state.lastIncrementalAt = this.now();
@@ -143,6 +147,15 @@ export class WorkflowCoordinator {
     if (state.status !== "running") return;
     state.activeWorkflow = null;
     state.nextRunAt = this.now() + config.repeatIntervalMinutes * 60_000;
+    await this.deps.setState(state);
+    await chrome.alarms.create(WORKFLOW_ALARM_NAME, { when: state.nextRunAt });
+  }
+
+  private async scheduleRateLimitBackoff(retryAfterMs: number): Promise<void> {
+    const state = await this.deps.getState();
+    if (state.status !== "running") return;
+    state.activeWorkflow = null;
+    state.nextRunAt = this.now() + retryAfterMs;
     await this.deps.setState(state);
     await chrome.alarms.create(WORKFLOW_ALARM_NAME, { when: state.nextRunAt });
   }
