@@ -53,7 +53,7 @@ function harness(options: { known?: string[]; state?: Partial<WorkflowState> } =
     ["first", page([{ id: 3314, name: "Source" }], null)],
   ]);
   const predictionPages = new Map<number, ApiPage<AgentPrediction>[]>([
-    [3314, [page([prediction("new-first"), prediction("known-middle")], { offset: 2 }), page([prediction("new-after-known")], null)]],
+    [3314, [page([prediction("new-first", 101), prediction("known-middle", 202)], { before: 202 }), page([prediction("new-after-known", 303)], null)]],
   ]);
   const requestedSources: number[] = [];
   return {
@@ -63,9 +63,9 @@ function harness(options: { known?: string[]; state?: Partial<WorkflowState> } =
       api: {
         listAgents: vi.fn(async () => [{ id: 900, name: "Target", active: true, onchain_identity: null }]),
         listSquareAgents: vi.fn(async ({ cursor }: { cursor?: string }) => squarePages.get(cursor ?? "first")!),
-        listAgentPredictions: vi.fn(async ({ sourceAgentId, offset = 0 }: { sourceAgentId: number; offset?: number }) => {
+        listAgentPredictions: vi.fn(async ({ sourceAgentId, before }: { sourceAgentId: number; before?: number }) => {
           requestedSources.push(sourceAgentId);
-          return predictionPages.get(sourceAgentId)![offset === 0 ? 0 : 1]!;
+          return predictionPages.get(sourceAgentId)![before === undefined ? 0 : 1]!;
         }),
       },
       walletAddress: "0x" + "11".repeat(20),
@@ -107,6 +107,25 @@ describe("Predictions runner", () => {
     await runPredictions(setup.deps, { scan: "incremental", targetAgentId: 900 });
 
     expect(setup.requestedSources[0]).toBe(3314);
+  });
+
+  it("uses before cursor from the previous predictions page", async () => {
+    const setup = harness();
+
+    await runPredictions(setup.deps, { scan: "full", targetAgentId: 900 });
+
+    expect(setup.deps.api.listAgentPredictions).toHaveBeenNthCalledWith(1, {
+      sourceAgentId: 3314,
+      chainId: 16661,
+      limit: 20,
+      before: undefined,
+    });
+    expect(setup.deps.api.listAgentPredictions).toHaveBeenNthCalledWith(2, {
+      sourceAgentId: 3314,
+      chainId: 16661,
+      limit: 20,
+      before: 202,
+    });
   });
 
   it("rejects a target that is not owned by the wallet", async () => {

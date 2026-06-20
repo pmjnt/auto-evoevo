@@ -120,14 +120,14 @@ async function processSource(
   deps: PredictionsRunnerDeps,
   args: { sourceAgentId: number; targetAgentId: number; full: boolean },
 ): Promise<RunnerResult> {
-  let offset = 0;
+  let before: number | undefined;
   const seenFingerprints = new Set<string>();
   while (true) {
     const page = await deps.api.listAgentPredictions({
       sourceAgentId: args.sourceAgentId,
       chainId: deps.chainId,
       limit: 20,
-      offset,
+      before,
     });
     assertFreshPage(seenFingerprints, page, `predictions:${args.sourceAgentId}`);
     let sawUnknown = false;
@@ -220,12 +220,12 @@ async function processSource(
 
     if (completed.length > 0) await deps.registry.completePage(completed);
     const state = await deps.checkpoint.load();
-    state.predictionOffsets[String(args.sourceAgentId)] = page.next?.offset ?? 0;
+    state.predictionOffsets[String(args.sourceAgentId)] = page.next?.before ?? 0;
     await deps.checkpoint.save(state);
 
-    if (!page.next?.offset) break;
+    if (!page.next?.before) break;
     if (!args.full && !sawUnknown) break;
-    offset = page.next.offset;
+    before = page.next.before;
   }
   return { kind: "completed" };
 }

@@ -61,7 +61,7 @@ export type FromOpinionResponse = {
   token_id: string;
 };
 
-export type PageRequest = { cursor?: string; offset?: number };
+export type PageRequest = { cursor?: string; before?: number };
 export type ApiPage<T> = {
   items: T[];
   next: PageRequest | null;
@@ -202,20 +202,19 @@ export class EvoEvoApiClient {
     sourceAgentId: number;
     chainId: number;
     limit?: number;
-    offset?: number;
+    before?: number;
   }): Promise<ApiPage<AgentPrediction>> {
     const limit = args.limit ?? 20;
-    const offset = args.offset ?? 0;
     const params = new URLSearchParams({
       limit: String(limit),
-      offset: String(offset),
       chain_id: String(args.chainId),
     });
+    if (args.before !== undefined) params.set("before", String(args.before));
     const raw = await this.requestJson<unknown>(
       "GET",
       `${this.baseUrl}/v1/agents/${args.sourceAgentId}/predictions?${params.toString()}`,
     );
-    return normalizePredictionsPage(raw, offset);
+    return normalizePredictionsPage(raw, limit);
   }
 
   // POST /v1/agents/{agentId}/memories/from-opinion
@@ -353,23 +352,30 @@ function normalizeSquarePage(raw: unknown): ApiPage<SquareAgent> {
   return { items, next, fingerprint: fingerprint(items.map((item) => String(item.id))) };
 }
 
-function normalizePredictionsPage(raw: unknown, offset: number): ApiPage<AgentPrediction> {
+function normalizePredictionsPage(raw: unknown, limit: number): ApiPage<AgentPrediction> {
   const record = asRecord(raw, "Predictions");
-  const items = asArray(record.items, "Prediction items").map((item) => {
+  const normalized = asArray(record.items, "Prediction items").map((item) => {
     const entry = asRecord(item, "Prediction item");
+    const cursorId = Number(entry.id);
     const predictionId = String(entry.prediction_id ?? "");
     const opinionId = Number(entry.opinion_id);
     const createdAt = String(entry.created_at ?? entry.opinion_created_at ?? "");
-    if (!predictionId || !Number.isInteger(opinionId) || opinionId <= 0 || !createdAt) {
+    if (
+      !Number.isInteger(cursorId)
+      || cursorId <= 0
+      || !predictionId
+      || !Number.isInteger(opinionId)
+      || opinionId <= 0
+      || !createdAt
+    ) {
       throw new Error("Invalid prediction identity");
     }
-    return { predictionId, opinionId, createdAt };
+    return { cursorId, prediction: { predictionId, opinionId, createdAt } };
   });
-  const summary = asRecord(record.summary ?? {}, "Prediction summary");
-  const total = Number(summary.total ?? items.length);
-  const consumed = offset + items.length;
-  const next = items.length > 0 && Number.isFinite(total) && consumed < total
-    ? { offset: consumed }
+  const items = normalized.map((item) => item.prediction);
+  const lastCursor = normalized.at(-1)?.cursorId;
+  const next = items.length >= limit && lastCursor !== undefined
+    ? { before: lastCursor }
     : null;
   return {
     items,

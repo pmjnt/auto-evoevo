@@ -123,12 +123,14 @@ describe("EvoEvoApiClient", () => {
     expect(page.next).toEqual({ cursor: "cursor-page-2" });
   });
 
-  it("normalizes prediction IDs and advances by offset", async () => {
+  it("normalizes prediction IDs and advances by before cursor", async () => {
+    const calls: string[] = [];
     const fetchFn = vi.fn(async (called: string) => {
       if (called.endsWith("/v1/auth/nonce")) return jsonResponse({ message: "m", nonce: "n" });
       if (called.endsWith("/v1/auth/login")) {
         return jsonResponse({ token: TOKEN, expires_at: "3026-01-01T00:00:00Z" });
       }
+      calls.push(called);
       expect(called).toContain("/v1/agents/3314/predictions?");
       return jsonResponse(predictionsFixture);
     }) as unknown as typeof fetch;
@@ -139,7 +141,7 @@ describe("EvoEvoApiClient", () => {
       sourceAgentId: 3314,
       chainId: 16661,
       limit: 2,
-      offset: 0,
+      before: 358914,
     });
 
     expect(page.items[0]).toEqual({
@@ -147,7 +149,9 @@ describe("EvoEvoApiClient", () => {
       opinionId: 4325811,
       createdAt: "2026-06-17T09:13:26.761736+08:00",
     });
-    expect(page.next).toEqual({ offset: 2 });
+    expect(calls[0]).toContain("before=358914");
+    expect(calls[0]).not.toContain("offset=");
+    expect(page.next).toEqual({ before: 4259030 });
   });
 
   it("memoryFromOpinion posts the opinion id and returns the signed payload", async () => {
