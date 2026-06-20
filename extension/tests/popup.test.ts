@@ -102,4 +102,9 @@ describe("popup workflow console", () => {
     expect(popupHtml).toContain('id="predictions-panel"');
     expect(popupHtml).not.toMatch(/linear-gradient|radial-gradient/);
   });
+
+  it("routes workflow activity through the event formatter", () => {
+    const popupSource = readFileSync(resolve("src/ui/popup.ts"), "utf8");
+    expect(popupSource).toContain("formatWorkflowEvent(event)");
+  });
 });

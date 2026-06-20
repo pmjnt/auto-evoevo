@@ -1,4 +1,5 @@
 import { send } from "./shared.js";
+import { formatWorkflowEvent } from "./workflow-events.js";
 import type { ExtensionConfig, WorkflowState } from "../shared/types.js";
 
 const DEFAULT_CONFIG: ExtensionConfig = {
@@ -362,6 +363,12 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message: Record<string, unknown>) => {
     if (message.type !== "workflow-event" && message.type !== "direct-event") return;
     const event = message.event as Record<string, unknown>;
+    const formatted = formatWorkflowEvent(event);
+    if (formatted !== null) {
+      appendEventLog(formatted);
+      void refreshStatus();
+      return;
+    }
     switch (event.type) {
       case "started":
         appendEventLog("[round] started");
