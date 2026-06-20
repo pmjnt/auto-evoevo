@@ -24,6 +24,7 @@ export type ExtensionConfig = {
   allowedContracts: string[];
   allowedFunctionSelectors: string[];
   maxFeeNative: number;
+  gasPriceJitterPercent: number;
   dryRun: boolean;
   cooldownSeconds: number;
   // Stop automation when each feed tab has fewer than this many

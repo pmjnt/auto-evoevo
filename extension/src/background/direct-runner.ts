@@ -65,9 +65,24 @@ export type DirectRunnerDeps = {
   onEvent: (event: DirectAutomationEvent) => void;
   isPaused: () => boolean;
   sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
 };
 
 const DEFAULT_FALLBACK_GAS = 400_000n;
+const JITTER_SCALE = 10_000n;
+
+export function applyGasPriceJitter(
+  baseGasPrice: bigint,
+  maxJitterPercent: number,
+  random: () => number = Math.random,
+): bigint {
+  if (maxJitterPercent <= 0) return baseGasPrice;
+  const boundedRandom = Math.max(0, Math.min(1, random()));
+  const jitterBasisPoints = BigInt(
+    Math.floor(boundedRandom * maxJitterPercent * 100),
+  );
+  return (baseGasPrice * (JITTER_SCALE + jitterBasisPoints)) / JITTER_SCALE;
+}
 
 export async function runDirect(deps: DirectRunnerDeps): Promise<void> {
   const sleep =
@@ -167,7 +182,6 @@ export async function runDirect(deps: DirectRunnerDeps): Promise<void> {
           });
           return;
         }
-        // Skip this opinion; backend may have rejected (already intaken, etc.).
         await deps.log.append(
           makeLog({
             status: "skipped",
@@ -188,7 +202,12 @@ export async function runDirect(deps: DirectRunnerDeps): Promise<void> {
         continue;
       }
 
-      // Non-approve: pause the whole loop.
+      if (outcome.kind === "skipped") {
+        if (cooldownMs > 0) await sleep(cooldownMs);
+        continue;
+      }
+
+      // Hard failure (reverted, rpc_failed, guard reject): stop the loop.
       deps.onEvent({ type: "paused", reason: outcome.reason });
       return;
     }
@@ -199,6 +218,7 @@ export async function runDirect(deps: DirectRunnerDeps): Promise<void> {
 
 type SubmitOutcome =
   | { kind: "approved"; txHash: string }
+  | { kind: "skipped"; reason: string }
   | { kind: "rejected"; reason: string };
 
 async function submitIntake(args: {
@@ -216,7 +236,12 @@ async function submitIntake(args: {
 
   // Pre-fetch nonce + gas before guard so estimatedFeeNative is honest.
   const nonce = await rpc.getTransactionCount(fromAddress, "pending");
-  const gasPrice = await rpc.gasPrice();
+  const baseGasPrice = await rpc.gasPrice();
+  const gasPrice = applyGasPriceJitter(
+    baseGasPrice,
+    config.gasPriceJitterPercent,
+    deps.random,
+  );
 
   let gasLimit: bigint;
   try {
@@ -246,21 +271,25 @@ async function submitIntake(args: {
 
   const decision = evaluateWalletRequest(walletRequest, config);
 
-  if (decision.status !== "approve" || config.dryRun) {
-    const status: AttemptStatus = config.dryRun
-      ? "dry_run"
-      : decision.status === "reject"
-        ? "rejected"
-        : "manual_review";
+  if (decision.status !== "approve") {
+    const status: AttemptStatus =
+      decision.status === "reject" ? "rejected" : "manual_review";
+    await log.append(
+      makeLog({ status, reason: decision.reason, walletRequest, decision }),
+    );
+    return { kind: "rejected", reason: decision.reason };
+  }
+
+  if (config.dryRun) {
     await log.append(
       makeLog({
-        status,
+        status: "dry_run",
         reason: decision.reason,
         walletRequest,
         decision,
       }),
     );
-    return { kind: "rejected", reason: decision.reason };
+    return { kind: "skipped", reason: "dry-run" };
   }
 
   const signed = await wallet.signTransaction({

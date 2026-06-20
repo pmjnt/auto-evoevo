@@ -16,6 +16,10 @@ const wallet = new Wallet();
 const log = new SessionLog();
 let paused = false;
 let directLoopRunning = false;
+let lastRunStatus: "idle" | "running" | "done" | "error" = "idle";
+let stopResolve: (() => void) | null = null;
+
+const ROUND_INTERVAL_MS = 30_000;
 
 // Persist the SIWE token across service-worker restarts. Lives in
 // chrome.storage.session so it is cleared when the user closes Chrome
@@ -45,6 +49,14 @@ const evoEvoApi = new EvoEvoApiClient({
 export type RouterResponse =
   | { ok: true; [key: string]: unknown }
   | { ok: false; error: { code: number; message: string } };
+
+async function stopAndWait(): Promise<void> {
+  if (!directLoopRunning) return;
+  paused = true;
+  await new Promise<void>((resolve) => {
+    stopResolve = resolve;
+  });
+}
 
 export async function handleMessage(raw: unknown): Promise<RouterResponse> {
   let message;
@@ -86,12 +98,11 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
           error: { code: 4100, message: "Wallet has no private key" },
         };
       }
-      const config = await getConfig();
-      if (config === null) {
-        return {
-          ok: false,
-          error: { code: 4100, message: "Extension not configured" },
-        };
+      let chainId = 16661;
+      try {
+        chainId = (await getConfig())?.chainId ?? 16661;
+      } catch {
+        chainId = 16661;
       }
       try {
         await evoEvoApi.ensureAuth(wallet.address, (msg) =>
@@ -99,7 +110,7 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
         );
         const agents = await evoEvoApi.listAgents(
           wallet.address,
-          config.chainId,
+          chainId,
         );
         return { ok: true, agents };
       } catch (error) {
@@ -121,6 +132,7 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
         address: wallet.address,
         paused,
         running: directLoopRunning,
+        lastRunStatus,
         counts: await log.counts(),
       };
     }
@@ -133,8 +145,14 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
       return { ok: true };
 
     case "resume":
-    case "start": {
       paused = false;
+      return await startAutomation();
+
+    case "start": {
+      await stopAndWait();
+      paused = false;
+      await log.clear();
+      lastRunStatus = "idle";
       return await startAutomation();
     }
 
@@ -177,28 +195,40 @@ async function startAutomation(): Promise<RouterResponse> {
   }
 
   directLoopRunning = true;
+  lastRunStatus = "running";
   void (async () => {
     try {
       const rpc = new RpcClient(config.rpcUrl);
-      await runDirect({
-        config,
-        wallet: {
-          address: wallet.address,
-          signMessage: (msg) => wallet.signMessage(msg),
-          signTransaction: (tx) => wallet.signTransaction(tx),
-        },
-        rpc,
-        api: evoEvoApi,
-        log,
-        onEvent: (event) => {
-          void chrome.runtime
-            .sendMessage({ type: "direct-event", event })
-            .catch(() => undefined);
-        },
-        isPaused: () => paused,
-      });
+      while (!paused) {
+        await runDirect({
+          config,
+          wallet: {
+            address: wallet.address,
+            signMessage: (msg) => wallet.signMessage(msg),
+            signTransaction: (tx) => wallet.signTransaction(tx),
+          },
+          rpc,
+          api: evoEvoApi,
+          log,
+          onEvent: (event) => {
+            void chrome.runtime
+              .sendMessage({ type: "direct-event", event })
+              .catch(() => undefined);
+          },
+          isPaused: () => paused,
+        });
+        if (paused) break;
+        await new Promise((r) => setTimeout(r, ROUND_INTERVAL_MS));
+      }
+      lastRunStatus = paused ? "idle" : "done";
+    } catch {
+      lastRunStatus = "error";
     } finally {
       directLoopRunning = false;
+      if (stopResolve) {
+        stopResolve();
+        stopResolve = null;
+      }
     }
   })();
   return { ok: true, started: true };

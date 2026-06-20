@@ -107,7 +107,8 @@ describe("EvoEvoApiClient", () => {
         reasoning_intake_with_sig: {
           chain_id: 16661,
           contract_address: "0x61bb71442749d13a4BB7257DfBFFf0452ae937f9",
-          method: "intakeReasoning",
+          method: "intakeReasoningV2",
+          identity_registry_address: "0x8004Ae533a0301CbD7508373b663756D26DfB028",
           updater: ADDR,
           token_id: "4644",
           source_opinion_id: "2956",
@@ -129,6 +130,10 @@ describe("EvoEvoApiClient", () => {
     );
     expect(JSON.parse(captured!.body)).toEqual({ opinion_id: 2956 });
     expect(result.reasoning_intake_with_sig.source_opinion_id).toBe("2956");
+    expect(result.reasoning_intake_with_sig.method).toBe("intakeReasoningV2");
+    expect(result.reasoning_intake_with_sig.identity_registry_address).toBe(
+      "0x8004Ae533a0301CbD7508373b663756D26DfB028",
+    );
   });
 
   it("throws EvoEvoAuthError on 401 and clears cached auth", async () => {

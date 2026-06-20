@@ -4,7 +4,7 @@
   "rabbyExtensionId": "acmacodkjbdgmoleebolmdjonilkdbch",
   "allowedOrigin": "https://evoevo.ai",
   "allowedChain": "0G",
-  "allowedContracts": ["0x61bb710000000000000000000000000000e937f9"],
+  "allowedContracts": ["0x61bb71442749d13a4bb7257dfbfff0452ae937f9"],
   "maxFeeNative": 0.001,
   "allowLearnedActionPattern": false,
   "dryRun": true,

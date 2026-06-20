@@ -258,6 +258,7 @@
           <button id="start" class="btn">Start</button>
         </div>
         <div id="start-msg" class="msg"></div>
+        <div id="event-log" class="msg" style="max-height:60px;overflow-y:auto;white-space:pre-line;margin-top:4px"></div>
 
         <!-- AGENT -->
         <div class="config-section">
@@ -289,6 +290,13 @@
               <label for="maxFeeNative">Max fee (OG)</label>
               <input id="maxFeeNative" class="input" type="text" placeholder="0.01" />
             </div>
+          </div>
+          <div class="field">
+            <div class="field-label">
+              <label for="gasPriceJitterPercent">Gas jitter (%)</label>
+              <span class="hint">0-100, default 10</span>
+            </div>
+            <input id="gasPriceJitterPercent" class="input" type="number" min="0" max="100" step="1" />
           </div>
         </div>
 

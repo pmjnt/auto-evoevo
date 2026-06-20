@@ -20,6 +20,7 @@ describe("background router (no password)", () => {
       allowedContracts: ["0x" + "ab".repeat(20)],
       allowedFunctionSelectors: ["0x4ed1f275"],
       maxFeeNative: 0.001,
+      gasPriceJitterPercent: 10,
       dryRun: true,
       cooldownSeconds: 0,
       stopAtRemaining: 0,

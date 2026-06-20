@@ -10,6 +10,7 @@ const baseConfig: ExtensionConfig = {
   allowedContracts: ["0x61bb710000000000000000000000000000e937f9"],
   allowedFunctionSelectors: ["0xd0e30db0"],
   maxFeeNative: 0.001,
+  gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 0,
   stopAtRemaining: 0,

@@ -49,6 +49,7 @@ export const setConfigSchema = z.object({
     allowedContracts: z.array(z.string().regex(HEX)),
     allowedFunctionSelectors: z.array(z.string().regex(HEX)),
     maxFeeNative: z.number().positive(),
+    gasPriceJitterPercent: z.number().min(0).max(100).default(10),
     dryRun: z.boolean(),
     cooldownSeconds: z.number().int().min(0).max(300).default(0),
     stopAtRemaining: z.number().int().min(0).max(1000).default(10),

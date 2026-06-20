@@ -7,8 +7,9 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   chainId: 16661,
   rpcUrl: "https://evmrpc.0g.ai",
   allowedContracts: ["0x61bb71442749d13a4bb7257dfbfff0452ae937f9"],
-  allowedFunctionSelectors: ["0x4ed1f275"],
+  allowedFunctionSelectors: ["0xa29adb25"],
   maxFeeNative: 0.01,
+  gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 1,
   stopAtRemaining: 10,
@@ -21,6 +22,7 @@ type Status = {
   address: string | null;
   paused: boolean;
   running?: boolean;
+  lastRunStatus?: "idle" | "running" | "done" | "error";
   counts: Record<string, number>;
 };
 
@@ -91,6 +93,12 @@ async function refreshStatus(): Promise<void> {
     } else if (status.running) {
       statusEl.textContent = "running";
       statusEl.style.color = "#65d18f";
+    } else if (status.lastRunStatus === "done") {
+      statusEl.textContent = "done";
+      statusEl.style.color = "#65d18f";
+    } else if (status.lastRunStatus === "error") {
+      statusEl.textContent = "error";
+      statusEl.style.color = "#ef6461";
     } else {
       statusEl.textContent = "idle";
       statusEl.style.color = "#b9a895";
@@ -110,6 +118,7 @@ function fillConfig(config: ExtensionConfig): void {
   setInput("rpcUrl", config.rpcUrl);
   setInput("chainId", config.chainId);
   setInput("maxFeeNative", config.maxFeeNative);
+  setInput("gasPriceJitterPercent", config.gasPriceJitterPercent);
   setInput("allowedContracts", config.allowedContracts.join(", "));
   setInput("allowedFunctionSelectors", config.allowedFunctionSelectors.join(", "));
   setInput("cooldownSeconds", config.cooldownSeconds);
@@ -168,11 +177,12 @@ async function loadAgents(): Promise<void> {
 // --- WIRING ---
 
 document.getElementById("saveKey")?.addEventListener("click", async () => {
-  const privateKey = elValue("setupPrivateKey");
-  if (!privateKey) {
+  const raw = elValue("setupPrivateKey").trim();
+  if (!raw) {
     setMsg("setup-msg", "Paste a private key first.", "err");
     return;
   }
+  const privateKey = raw.startsWith("0x") ? raw : `0x${raw}`;
   const response = (await send({ type: "set-private-key", privateKey })) as {
     ok: boolean;
     address?: string;
@@ -200,7 +210,44 @@ document.getElementById("pause")?.addEventListener("click", async () => {
   await refreshStatus();
 });
 
+function currentConfig() {
+  const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;
+  return {
+    allowedOrigin: "https://evoevo.ai",
+    allowedChain: "0G",
+    chainId: Number(elValue("chainId")) || DEFAULT_CONFIG.chainId,
+    rpcUrl: elValue("rpcUrl") || DEFAULT_CONFIG.rpcUrl,
+    allowedContracts: elValue("allowedContracts")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean),
+    allowedFunctionSelectors: elValue("allowedFunctionSelectors")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean),
+    maxFeeNative: Number(elValue("maxFeeNative")) || DEFAULT_CONFIG.maxFeeNative,
+    gasPriceJitterPercent: (() => {
+      const value = Number(elValue("gasPriceJitterPercent"));
+      if (!Number.isFinite(value)) return DEFAULT_CONFIG.gasPriceJitterPercent;
+      return Math.max(0, Math.min(100, value));
+    })(),
+    dryRun: dryRunEl?.checked ?? true,
+    cooldownSeconds: Math.max(0, Math.min(300, Number(elValue("cooldownSeconds")) || 0)),
+    stopAtRemaining: Math.max(0, Math.min(1000, Number(elValue("stopAtRemaining")) || 0)),
+    agentId: Math.max(0, Number(elValue("agentId")) || 0),
+  };
+}
+
 document.getElementById("start")?.addEventListener("click", async () => {
+  setMsg("start-msg", "Saving config…", "info");
+  const saveResp = (await send({ type: "set-config", config: currentConfig() })) as {
+    ok: boolean;
+    error?: { message: string };
+  };
+  if (!saveResp.ok) {
+    setMsg("start-msg", `Config save failed: ${saveResp.error?.message ?? "unknown"}`, "err");
+    return;
+  }
   setMsg("start-msg", "Starting…", "info");
   const response = (await send({ type: "start" })) as {
     ok: boolean;
@@ -226,27 +273,7 @@ document.getElementById("loadAgents")?.addEventListener("click", (event) => {
 });
 
 document.getElementById("save")?.addEventListener("click", async () => {
-  const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;
-  const config = {
-    allowedOrigin: "https://evoevo.ai",
-    allowedChain: "0G",
-    chainId: Number(elValue("chainId")) || DEFAULT_CONFIG.chainId,
-    rpcUrl: elValue("rpcUrl") || DEFAULT_CONFIG.rpcUrl,
-    allowedContracts: elValue("allowedContracts")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    allowedFunctionSelectors: elValue("allowedFunctionSelectors")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-    maxFeeNative: Number(elValue("maxFeeNative")) || DEFAULT_CONFIG.maxFeeNative,
-    dryRun: dryRunEl?.checked ?? true,
-    cooldownSeconds: Math.max(0, Math.min(300, Number(elValue("cooldownSeconds")) || 0)),
-    stopAtRemaining: Math.max(0, Math.min(1000, Number(elValue("stopAtRemaining")) || 0)),
-    agentId: Math.max(0, Number(elValue("agentId")) || 0),
-  };
-
+  const config = currentConfig();
   const resp = (await send({ type: "set-config", config })) as {
     ok: boolean;
     error?: { message: string };
@@ -262,3 +289,41 @@ void refreshStatus();
 setInterval(() => {
   void refreshStatus();
 }, 2000);
+
+const MAX_LOG_LINES = 6;
+
+function appendEventLog(text: string): void {
+  const el = document.getElementById("event-log");
+  if (!el) return;
+  const lines = el.textContent?.split("\n").filter(Boolean) ?? [];
+  lines.push(text);
+  el.textContent = lines.slice(-MAX_LOG_LINES).join("\n");
+  el.scrollTop = el.scrollHeight;
+}
+
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message: Record<string, unknown>) => {
+    if (message.type !== "direct-event") return;
+    const event = message.event as Record<string, unknown>;
+    switch (event.type) {
+      case "started":
+        appendEventLog("[round] started");
+        break;
+      case "tab":
+        appendEventLog(`[tab] ${event.tab}`);
+        break;
+      case "fetched":
+        appendEventLog(`[feed] ${event.tab}: ${event.count} items`);
+        break;
+      case "approved":
+        appendEventLog(`[tx] ${(event.txHash as string).slice(0, 14)}...`);
+        break;
+      case "paused":
+        appendEventLog(`[pause] ${event.reason}`);
+        break;
+      case "done":
+        appendEventLog("[round] done");
+        break;
+    }
+  });
+}

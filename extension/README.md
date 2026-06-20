@@ -69,19 +69,17 @@ Trang options yêu cầu các trường sau:
 
 | Field | Giá trị mẫu | Ghi chú |
 |---|---|---|
-| **0G RPC URL** | `https://evmrpc-testnet.0g.ai` (hoặc URL từ Rabby) | Copy nguyên xi từ network 0G trong Rabby. |
-| **Chain id** | `16601` testnet, hoặc số tương ứng từ Rabby | Phải khớp chain id trong Rabby, sai → tx bị reject. |
+| **0G RPC URL** | `https://evmrpc.0g.ai` | RPC used by the current 0G workflow in the HAR capture. |
+| **Chain id** | `16661` | Must match EvoEvo's current `chain_id` and the signed payload. |
 | **Max fee (OG)** | `0.001` | Cap fee tối đa cho 1 tx. Vượt → guard reject. |
-| **Allowed contracts** | `0x61bb710000000000000000000000000000e937f9` | Cách nhau bằng dấu phẩy nếu có nhiều. Copy nguyên xi (lower-case OK, extension tự normalize). |
-| **Allowed function selectors** | `0xd0e30db0` | 4 byte đầu của data. Xem [Phụ lục A](#phụ-lục-a-lấy-function-selector) để biết cách lấy. |
-| **Idle-lock minutes** | `30` | Sau X phút không ký → tự khoá vault, phải nhập password lại. |
+| **Allowed contracts** | `0x61bb71442749d13a4bb7257dfbfff0452ae937f9` | Current EvoEvo intake contract from the HAR capture. |
+| **Allowed function selectors** | `0xa29adb25` | `intakeReasoningV2(address,uint256,uint256,bytes32,bytes32,bytes32,uint256,uint256,bytes)`. |
 | **Dry-run mode** | ☑ tick (default) | **Lần đầu LUÔN để dry-run ON.** Bỏ tick chỉ khi đã smoke test xong. |
 | **Private key** | `0x...` (32-byte hex) | **CHỈ dùng burner wallet.** Sau khi save sẽ tự clear khỏi form. |
-| **Master password** | (tối thiểu 8 ký tự) | Dùng để mã hoá vault AES-GCM. Quên password = mất key, phải import lại. |
 
 Bấm **Save**. Status hiển thị "Saved" màu xanh.
 
-> Sau khi save thành công, private key đã được mã hoá AES-GCM với password và lưu trong `chrome.storage.local`. Field "Private key" tự clear, không lưu nguyên text.
+> Current implementation stores the burner private key in `chrome.storage.local` plaintext. It does not use an AES vault or master password.
 
 ---
 
@@ -96,7 +94,7 @@ EvoEvo dùng Reown picker. Reown đọc Rabby qua EIP-6963 announce event và **
 1. **Cùng burner key trong cả 2 chỗ:**
    - Tạo burner wallet mới (vd MetaMask devtool, hoặc `node -e "console.log(require('ethers').Wallet.createRandom().privateKey)"`)
    - Import key đó vào **Rabby** (Add account → Import private key)
-   - Import **cùng key đó** vào Auto EvoEvo Options (private key + master password)
+   - Import **cùng key đó** vào Auto EvoEvo Settings (private key only)
 2. Nạp ít OG vào địa chỉ này.
 3. Trong Rabby, switch sang account burner trước khi connect EvoEvo.
 
@@ -137,7 +135,7 @@ Nếu Rabby tắt hoàn toàn → extension fallback sang standalone mode: là `
 
 1. Mở tab `https://evoevo.ai`. Bấm **Connect** (góc phải trên) → picker mở → click **"MetaMask"** (đây thực ra là Auto EvoEvo, xem lưu ý ở bước 4). Connect xong, vào tab **FEED**.
 2. Bấm icon extension → popup hiện form nhập password.
-3. Nhập master password đã set ở bước 3 cấu hình → bấm **Unlock**.
+3. Đảm bảo burner private key đã được import trong Settings.
 4. Popup chuyển sang trạng thái unlocked, hiện địa chỉ ví + dòng **Status** + counter `Signed/Dry-run/Manual/Rejected`. Nếu page chưa thấy account, refresh hoặc click Connect lại — extension sẽ broadcast `accountsChanged` event.
 5. Bấm **Start** trong popup. Dòng status chuyển sang `running` (màu xanh), và popup hiện `Started on N EvoEvo tab(s).` ở dưới.
 
@@ -182,9 +180,8 @@ Nếu pass cả 2 test → bật lại `maxFeeNative` về 0.001, để dry-run 
 ## 7. Cách dừng / khoá
 
 - **Tạm dừng tự động:** popup → nút **Pause**. Mọi `eth_sendTransaction` sau đó sẽ bị router reject với code 4001 "Automation paused".
-- **Khoá vault:** popup → nút **Lock**. Key biến khỏi RAM, ký lần sau cần unlock lại.
-- **Tự khoá:** sau `idleLockMinutes` không có activity, vault tự lock.
-- **Đóng Chrome:** vault tự lock (state in-memory).
+- **Xoá key:** Settings → Clear key. Ký lần sau cần import burner key lại.
+- **Đóng Chrome:** private key vẫn nằm trong `chrome.storage.local`; chỉ dùng Chrome profile riêng cho automation.
 - **Stop hoàn toàn:** `chrome://extensions` → tắt toggle Auto EvoEvo.
 
 ---
@@ -200,7 +197,7 @@ npm run build
 
 Sau đó vào `chrome://extensions` → Auto EvoEvo → bấm nút Reload (icon mũi tên tròn).
 
-Config và vault đã lưu trong `chrome.storage.local` không mất qua reload.
+Config và burner key đã lưu trong `chrome.storage.local` không mất qua reload.
 
 ---
 
@@ -212,7 +209,7 @@ Config và vault đã lưu trong `chrome.storage.local` không mất qua reload.
 4. Bấm vào 1 tx ADD TO MEMORY thành công.
 5. Trong tab **Input Data**, lấy **10 ký tự đầu tiên** (gồm `0x`):
    ```
-   0xd0e30db0a1b2c3d4...
+   0xa29adb25a1b2c3d4...
    ↑─────────↑
    10 chars = 0x + 8 hex = function selector
    ```
@@ -241,7 +238,7 @@ Tab evoevo.ai           Service worker (background)
                          └──────────────────┘
 ```
 
-- Private key chỉ tồn tại trong service worker sau khi unlock — **không bao giờ** rơi vào tab EvoEvo.
+- Private key is loaded by the service worker from `chrome.storage.local`; keep this Chrome profile dedicated to the burner wallet.
 - Origin verify dựa trên `sender.tab.url` (Chrome-controlled), không tin field do content script gửi.
 - Mọi tx phải qua guard: origin + chain + contract + value=0 + fee ≤ cap + function selector whitelist.
 - Reject về EvoEvo luôn là code 4001 — không leak guard reason ra trang.
@@ -253,10 +250,10 @@ Tab evoevo.ai           Service worker (background)
 Các điểm chưa hoàn thiện, ghi để bạn nắm:
 
 1. **`postMessage` dùng `"*"` targetOrigin** (defense-in-depth chưa tight). Risk thấp vì content vẫn filter qua field `source`.
-2. **Service worker bị Chrome kill khi rảnh.** Sau khi wake lại, vault locked → phải unlock lại. Inflight reconciliation đã có để không double-broadcast tx đã pending.
+2. **Service worker bị Chrome kill khi rảnh.** Sau khi wake lại, wallet reloads from storage and the SIWE token is rehydrated from session storage when available.
 3. **Manifest có `scripting` permission nhưng codebase chưa dùng.** Có thể xoá khi không cần.
 4. **Schema có `export-log` nhưng router chưa wire.** Không gây lỗi, chỉ trả `Unhandled type`. (`start`/`stop` đã wire.)
-5. **Chưa poll receipt trên 0G** sau khi broadcast — log entry `signed` ngay sau broadcast, không biết tx có revert on-chain hay không. Cần thêm task nếu muốn.
+5. **Receipt polling đã có trong direct runner.** Log `signed` chỉ được ghi sau khi receipt thành công; `reverted` và `rpc_failed` dừng automation để kiểm tra.
 
 ---
 
@@ -264,7 +261,7 @@ Các điểm chưa hoàn thiện, ghi để bạn nắm:
 
 ```powershell
 cd extension
-npm test          # 55 tests across 12 files
+npm test          # Vitest suite across extension tests
 npm run typecheck # tsc --noEmit, exit 0
 npm run build     # bundle vào dist/
 ```

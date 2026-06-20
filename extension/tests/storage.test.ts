@@ -14,9 +14,10 @@ const fakeConfig: ExtensionConfig = {
   allowedChain: "0G",
   chainId: 16661,
   rpcUrl: "https://rpc.example",
-  allowedContracts: ["0x61bb710000000000000000000000000000e937f9"],
-  allowedFunctionSelectors: ["0xd0e30db0"],
+  allowedContracts: ["0x61bb71442749d13a4bb7257dfbfff0452ae937f9"],
+  allowedFunctionSelectors: ["0xa29adb25"],
   maxFeeNative: 0.001,
+  gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 0,
   stopAtRemaining: 0,
@@ -52,6 +53,26 @@ describe("storage", () => {
   it("round-trips config", async () => {
     await setConfig(fakeConfig);
     expect(await getConfig()).toEqual(fakeConfig);
+  });
+
+  it("defaults gas jitter for old stored config", async () => {
+    const { gasPriceJitterPercent: _ignored, ...oldConfig } = fakeConfig;
+    await chrome.storage.local.set({ config: oldConfig });
+    expect(await getConfig()).toEqual(fakeConfig);
+  });
+
+  it("migrates old intakeReasoning selectors to intakeReasoningV2", async () => {
+    await chrome.storage.local.set({
+      config: {
+        ...fakeConfig,
+        allowedFunctionSelectors: ["0x4ed1f275", "0xd0e30db0"],
+      },
+    });
+
+    expect(await getConfig()).toEqual({
+      ...fakeConfig,
+      allowedFunctionSelectors: ["0xa29adb25"],
+    });
   });
 
   it("rejects invalid stored config shape", async () => {

@@ -37,7 +37,8 @@ export type FeedOpinion = {
 export type ReasoningIntakeWithSig = {
   chain_id: number;
   contract_address: string;
-  method: "intakeReasoning";
+  method: "intakeReasoningV2";
+  identity_registry_address: string;
   updater: string;
   token_id: string;
   source_opinion_id: string;

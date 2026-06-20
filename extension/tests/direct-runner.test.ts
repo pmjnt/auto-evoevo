@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
-import { runDirect, type DirectAutomationEvent } from "../src/background/direct-runner.js";
+import {
+  applyGasPriceJitter,
+  runDirect,
+  type DirectAutomationEvent,
+} from "../src/background/direct-runner.js";
 import {
   EvoEvoApiClient,
   type FeedOpinion,
@@ -16,8 +20,9 @@ const baseConfig: ExtensionConfig = {
   chainId: 16661,
   rpcUrl: "https://rpc.example",
   allowedContracts: ["0x61bb71442749d13a4bb7257dfbfff0452ae937f9"],
-  allowedFunctionSelectors: ["0x4ed1f275"],
+  allowedFunctionSelectors: ["0xa29adb25"],
   maxFeeNative: 0.01,
+  gasPriceJitterPercent: 10,
   dryRun: false,
   cooldownSeconds: 0,
   stopAtRemaining: 0,
@@ -28,7 +33,8 @@ function intakePayload(opinionId: number): ReasoningIntakeWithSig {
   return {
     chain_id: 16661,
     contract_address: "0x61bb71442749d13a4bb7257dfbfff0452ae937f9",
-    method: "intakeReasoning",
+    method: "intakeReasoningV2",
+    identity_registry_address: "0x8004ae533a0301cbd7508373b663756d26dfb028",
     updater: ADDR,
     token_id: "4644",
     source_opinion_id: String(opinionId),
@@ -60,9 +66,6 @@ class FakeApi {
       _address: string,
       signMessage: (message: string) => Promise<string>,
     ) => {
-      // Real EvoEvoApiClient.ensureAuth invokes signMessage during the
-      // SIWE flow; mirror that so the wallet's signMessage path is
-      // exercised by tests.
       await signMessage("fake SIWE message");
     },
   );
@@ -141,6 +144,24 @@ function makeLog() {
 describe("runDirect", () => {
   beforeEach(() => installFakeChromeApi());
 
+  it("keeps gas price unchanged when jitter is disabled", () => {
+    expect(applyGasPriceJitter(1_000_000_000n, 0, () => 0.75)).toBe(
+      1_000_000_000n,
+    );
+  });
+
+  it("applies positive gas price jitter without going below base", () => {
+    expect(applyGasPriceJitter(1_000_000_000n, 10, () => 0)).toBe(
+      1_000_000_000n,
+    );
+    expect(applyGasPriceJitter(1_000_000_000n, 10, () => 0.5)).toBe(
+      1_050_000_000n,
+    );
+    expect(applyGasPriceJitter(1_000_000_000n, 10, () => 1)).toBe(
+      1_100_000_000n,
+    );
+  });
+
   it("authenticates, walks every tab, signs each opinion, emits done", async () => {
     const api = new FakeApi();
     api.feedByTab.recommended = [feedItem(11), feedItem(12)];
@@ -171,6 +192,85 @@ describe("runDirect", () => {
     expect(events.at(-1)).toEqual({ type: "done" });
   });
 
+  it("signs with exact RPC gas price when gas jitter is disabled", async () => {
+    const api = new FakeApi();
+    api.feedByTab.recommended = [feedItem(11)];
+    const { wallet } = makeWallet();
+    const rpc = makeRpc();
+    const { log } = makeLog();
+
+    await runDirect({
+      config: { ...baseConfig, gasPriceJitterPercent: 0 },
+      wallet,
+      rpc: rpc as never,
+      api: api as unknown as EvoEvoApiClient,
+      log,
+      onEvent: () => undefined,
+      isPaused: () => false,
+      random: () => 1,
+    });
+
+    expect(wallet.signTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ gasPrice: 1_000_000_000n }),
+    );
+  });
+
+  it("signs with jittered gas price inside the configured range", async () => {
+    const api = new FakeApi();
+    api.feedByTab.recommended = [feedItem(11)];
+    const { wallet } = makeWallet();
+    const rpc = makeRpc();
+    const { log, entries } = makeLog();
+
+    await runDirect({
+      config: { ...baseConfig, gasPriceJitterPercent: 10 },
+      wallet,
+      rpc: rpc as never,
+      api: api as unknown as EvoEvoApiClient,
+      log,
+      onEvent: () => undefined,
+      isPaused: () => false,
+      random: () => 0.5,
+    });
+
+    expect(wallet.signTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ gasPrice: 1_050_000_000n }),
+    );
+    expect(entries[0]!.walletRequest!.estimatedFeeNative).toBe(
+      Number(72_000n * 1_050_000_000n) / 1e18,
+    );
+  });
+
+  it("rejects when post-jitter fee exceeds maxFeeNative", async () => {
+    const api = new FakeApi();
+    api.feedByTab.recommended = [feedItem(11)];
+    const { wallet } = makeWallet();
+    const rpc = makeRpc();
+    const { log, entries } = makeLog();
+    const events: DirectAutomationEvent[] = [];
+
+    await runDirect({
+      config: {
+        ...baseConfig,
+        maxFeeNative: 0.000075,
+        gasPriceJitterPercent: 10,
+      },
+      wallet,
+      rpc: rpc as never,
+      api: api as unknown as EvoEvoApiClient,
+      log,
+      onEvent: (e) => events.push(e),
+      isPaused: () => false,
+      random: () => 1,
+    });
+
+    expect(wallet.signTransaction).not.toHaveBeenCalled();
+    expect(entries[0]!.status).toBe("rejected");
+    expect(entries[0]!.walletRequest!.estimatedFeeNative).toBe(
+      Number(72_000n * 1_100_000_000n) / 1e18,
+    );
+    expect(events.at(-1)).toMatchObject({ type: "paused" });
+  });
   it("skips opinions the agent has already intaken", async () => {
     const api = new FakeApi();
     api.feedByTab.recommended = [feedItem(11, true), feedItem(12, false)];
@@ -193,13 +293,15 @@ describe("runDirect", () => {
     expect(entries.filter((e) => e.status === "signed")).toHaveLength(1);
   });
 
-  it("dry-run does not sign or broadcast", async () => {
+  it("dry-run logs all opinions but does not sign or broadcast", async () => {
     const api = new FakeApi();
-    api.feedByTab.recommended = [feedItem(11)];
+    api.feedByTab.recommended = [feedItem(11), feedItem(12)];
+    api.feedByTab.weekly = [feedItem(21)];
 
     const { wallet, calls } = makeWallet();
     const rpc = makeRpc();
     const { log, entries } = makeLog();
+    const events: DirectAutomationEvent[] = [];
 
     await runDirect({
       config: { ...baseConfig, dryRun: true },
@@ -207,13 +309,14 @@ describe("runDirect", () => {
       rpc: rpc as never,
       api: api as unknown as EvoEvoApiClient,
       log,
-      onEvent: () => undefined,
+      onEvent: (e) => events.push(e),
       isPaused: () => false,
     });
 
     expect(calls.signTransaction).toBe(0);
     expect(rpc.sendRawTransactionWithNonceRetry).not.toHaveBeenCalled();
-    expect(entries[0]!.status).toBe("dry_run");
+    expect(entries.filter((e) => e.status === "dry_run")).toHaveLength(3);
+    expect(events.at(-1)).toEqual({ type: "done" });
   });
 
   it("pauses if wallet is locked", async () => {
@@ -280,7 +383,6 @@ describe("runDirect", () => {
 
   it("stops at the configured remaining threshold", async () => {
     const api = new FakeApi();
-    // tab returns 5 items, threshold 5 -> skip tab (we leave it as a buffer)
     api.feedByTab.recommended = Array.from({ length: 5 }, (_, i) => feedItem(100 + i));
     api.feedByTab.weekly = [];
     api.feedByTab.monthly = [];
