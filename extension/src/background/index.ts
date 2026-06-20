@@ -17,6 +17,8 @@ import { runFeedWorkflow } from "./feed-workflow.js";
 import { ChromePredictionRegistry } from "./prediction-registry.js";
 import { runPredictions } from "./predictions-runner.js";
 import { submitIntake } from "./intake-submitter.js";
+import { preparePredictionIntake } from "./prediction-submitter.js";
+import { recordPredictionProgress } from "./prediction-progress.js";
 import {
   WORKFLOW_ALARM_NAME,
   WorkflowCoordinator,
@@ -110,10 +112,22 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
       registry,
       checkpoint: { load: getWorkflowState, save: setWorkflowState },
       isPaused: () => coordinator.isPaused(),
-      onProgress: async () => undefined,
+      onProgress: async (update) => await recordPredictionProgress(update, {
+        getState: getWorkflowState,
+        setState: setWorkflowState,
+        sendEvent: sendWorkflowEvent,
+      }),
       submitPrediction: async (_sourceAgentId, agentId, prediction) => {
-        const memory = await evoEvoApi.memoryFromOpinion(agentId, prediction.opinionId);
-        return await submitIntake(memory.reasoning_intake_with_sig, {
+        const prepared = await preparePredictionIntake({
+          api: evoEvoApi,
+          log,
+          sourceAgentId: _sourceAgentId,
+          targetAgentId: agentId,
+          predictionId: prediction.predictionId,
+          opinionId: prediction.opinionId,
+        });
+        if (prepared.kind === "already_adopted") return prepared;
+        return await submitIntake(prepared.memory.reasoning_intake_with_sig, {
           config: { ...config, agentId },
           wallet: {
             address: wallet.address,
