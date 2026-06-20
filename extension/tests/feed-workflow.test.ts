@@ -10,12 +10,36 @@ const agents: Agent[] = [11, 22, 33].map((id) => ({
 }));
 
 describe("Feed workflow", () => {
+  it("authenticates before loading owned agents", async () => {
+    const calls: string[] = [];
+    const result = await runFeedWorkflow({
+      api: {
+        listAgents: vi.fn(async () => {
+          calls.push("listAgents");
+          return [];
+        }),
+      },
+      ensureAuth: vi.fn(async () => {
+        calls.push("ensureAuth");
+      }),
+      walletAddress: "0x" + "11".repeat(20),
+      chainId: 16661,
+      runAgent: async () => ({ kind: "completed" }),
+      isPaused: () => false,
+      onProgress: () => undefined,
+    });
+
+    expect(result).toEqual({ kind: "completed" });
+    expect(calls).toEqual(["ensureAuth", "listAgents"]);
+  });
+
   it("runs every owned agent sequentially", async () => {
     const calls: number[] = [];
     let concurrent = 0;
     let maxConcurrent = 0;
     const result = await runFeedWorkflow({
       api: { listAgents: vi.fn(async () => agents) },
+      ensureAuth: vi.fn(async () => undefined),
       walletAddress: "0x" + "11".repeat(20),
       chainId: 16661,
       runAgent: async (agentId) => {
@@ -40,6 +64,7 @@ describe("Feed workflow", () => {
     let paused = false;
     const result = await runFeedWorkflow({
       api: { listAgents: vi.fn(async () => agents) },
+      ensureAuth: vi.fn(async () => undefined),
       walletAddress: "0x" + "11".repeat(20),
       chainId: 16661,
       runAgent: async (agentId) => {
@@ -59,6 +84,7 @@ describe("Feed workflow", () => {
     const calls: number[] = [];
     const result = await runFeedWorkflow({
       api: { listAgents: vi.fn(async () => agents) },
+      ensureAuth: vi.fn(async () => undefined),
       walletAddress: "0x" + "11".repeat(20),
       chainId: 16661,
       runAgent: async (agentId) => {

@@ -3,6 +3,7 @@ import type { RunnerResult } from "./direct-runner.js";
 
 export type FeedWorkflowDeps = {
   api: Pick<EvoEvoApiClient, "listAgents">;
+  ensureAuth: () => Promise<void>;
   walletAddress: string;
   chainId: number;
   runAgent: (agentId: number) => Promise<RunnerResult>;
@@ -17,6 +18,7 @@ export type FeedWorkflowDeps = {
 export async function runFeedWorkflow(
   deps: FeedWorkflowDeps,
 ): Promise<RunnerResult> {
+  await deps.ensureAuth();
   const agents = await deps.api.listAgents(deps.walletAddress, deps.chainId);
   deps.onProgress({ ownedAgents: agents.length, completed: 0, activeAgentId: null });
 

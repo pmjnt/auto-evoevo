@@ -74,6 +74,10 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
     const rpc = new RpcClient(config.rpcUrl);
     return await runFeedWorkflow({
       api: evoEvoApi,
+      ensureAuth: async () => await evoEvoApi.ensureAuth(
+        wallet.address!,
+        (message) => wallet.signMessage(message),
+      ),
       walletAddress: wallet.address,
       chainId: config.chainId,
       isPaused: (): boolean => coordinator.isPaused(),
