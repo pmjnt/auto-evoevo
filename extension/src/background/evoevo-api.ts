@@ -61,6 +61,20 @@ export type FromOpinionResponse = {
   token_id: string;
 };
 
+export type PageRequest = { cursor?: string; offset?: number };
+export type ApiPage<T> = {
+  items: T[];
+  next: PageRequest | null;
+  fingerprint: string;
+};
+
+export type SquareAgent = { id: number; name: string };
+export type AgentPrediction = {
+  predictionId: string;
+  opinionId: number;
+  createdAt: string;
+};
+
 // Allows the EvoEvoApiClient to persist its JWT outside of instance
 // memory. Production wires this to chrome.storage.session so the token
 // survives service-worker restarts but is cleared when Chrome closes.
@@ -74,6 +88,8 @@ export type ApiOptions = {
   baseUrl?: string;
   fetchFn?: typeof fetch;
   tokenStorage?: TokenStorage;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
 };
 
 export class EvoEvoApiClient {
@@ -81,11 +97,19 @@ export class EvoEvoApiClient {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
   private readonly tokenStorage: TokenStorage | null;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly random: () => number;
+  private authContext: {
+    address: string;
+    signMessage: (message: string) => Promise<string>;
+  } | null = null;
 
   constructor(options: ApiOptions = {}) {
     this.baseUrl = options.baseUrl ?? DEFAULT_BASE;
     this.fetchFn = options.fetchFn ?? fetch.bind(globalThis);
     this.tokenStorage = options.tokenStorage ?? null;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.random = options.random ?? Math.random;
   }
 
   isAuthed(): boolean {
@@ -99,6 +123,7 @@ export class EvoEvoApiClient {
     address: string,
     signMessage: (message: string) => Promise<string>,
   ): Promise<void> {
+    this.authContext = { address, signMessage };
     // Rehydrate from persistent storage if we don't have a live token.
     // Lets the loop survive a service-worker restart without forcing
     // the user to unlock + re-sign the SIWE message.
@@ -153,6 +178,46 @@ export class EvoEvoApiClient {
     );
   }
 
+  async listSquareAgents(args: {
+    chainId: number;
+    limit?: number;
+    cursor?: string;
+  }): Promise<ApiPage<SquareAgent>> {
+    const params = new URLSearchParams({
+      limit: String(args.limit ?? 20),
+      status: "all",
+      min_settled_predictions: "3",
+      type: "agent",
+      chain_id: String(args.chainId),
+    });
+    if (args.cursor) params.set("cursor", args.cursor);
+    const raw = await this.requestJson<unknown>(
+      "GET",
+      `${this.baseUrl}/v1/square/feed?${params.toString()}`,
+    );
+    return normalizeSquarePage(raw);
+  }
+
+  async listAgentPredictions(args: {
+    sourceAgentId: number;
+    chainId: number;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiPage<AgentPrediction>> {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+      chain_id: String(args.chainId),
+    });
+    const raw = await this.requestJson<unknown>(
+      "GET",
+      `${this.baseUrl}/v1/agents/${args.sourceAgentId}/predictions?${params.toString()}`,
+    );
+    return normalizePredictionsPage(raw, offset);
+  }
+
   // POST /v1/agents/{agentId}/memories/from-opinion
   async memoryFromOpinion(
     agentId: number,
@@ -173,26 +238,66 @@ export class EvoEvoApiClient {
     if (this.auth === null) {
       throw new Error("EvoEvoApiClient not authenticated (call ensureAuth first)");
     }
-    const response = await this.fetchFn(url, {
-      method,
-      headers: {
-        accept: "*/*",
-        "content-type": "application/json",
-        authorization: `Bearer ${this.auth.token}`,
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (response.status === 401) {
-      await this.clearAuth();
-      throw new EvoEvoAuthError(`Unauthorized: ${url}`);
+    let transientRetries = 0;
+    let reauthenticated = false;
+    while (true) {
+      let response: Response;
+      try {
+        response = await this.fetchFn(url, {
+          method,
+          headers: {
+            accept: "*/*",
+            "content-type": "application/json",
+            authorization: `Bearer ${this.auth?.token ?? ""}`,
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+      } catch (error) {
+        if (transientRetries < 3) {
+          await this.waitForRetry(transientRetries++);
+          continue;
+        }
+        throw new EvoEvoHttpError(
+          `EvoEvo API ${method} ${url} network failure: ${error instanceof Error ? error.message : String(error)}`,
+          null,
+          true,
+        );
+      }
+
+      if (response.status === 401) {
+        if (!reauthenticated && this.authContext !== null) {
+          reauthenticated = true;
+          await this.clearAuth();
+          await this.ensureAuth(
+            this.authContext.address,
+            this.authContext.signMessage,
+          );
+          continue;
+        }
+        await this.clearAuth();
+        throw new EvoEvoAuthError(`Unauthorized: ${url}`);
+      }
+
+      const retryable = response.status === 429 || response.status >= 500;
+      if (retryable && transientRetries < 3) {
+        await this.waitForRetry(transientRetries++);
+        continue;
+      }
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new EvoEvoHttpError(
+          `EvoEvo API ${method} ${url} -> ${response.status} ${response.statusText}: ${text.slice(0, 200)}`,
+          response.status,
+          retryable,
+        );
+      }
+      return (await response.json()) as T;
     }
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(
-        `EvoEvo API ${method} ${url} -> ${response.status} ${response.statusText}: ${text.slice(0, 200)}`,
-      );
-    }
-    return (await response.json()) as T;
+  }
+
+  private async waitForRetry(attempt: number): Promise<void> {
+    const base = Math.min(30_000, 500 * 2 ** attempt);
+    await this.sleep(base + Math.floor(base * 0.25 * this.random()));
   }
 }
 
@@ -201,4 +306,71 @@ export class EvoEvoAuthError extends Error {
     super(message);
     this.name = "EvoEvoAuthError";
   }
+}
+
+export class EvoEvoHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = "EvoEvoHttpError";
+  }
+}
+
+function normalizeSquarePage(raw: unknown): ApiPage<SquareAgent> {
+  const record = asRecord(raw, "Square feed");
+  const items = asArray(record.items, "Square feed items").map((item) => {
+    const entry = asRecord(item, "Square feed item");
+    const profile = asRecord(entry.agent_profile, "Square agent profile");
+    const id = Number(profile.agent_id);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("Invalid Square agent id");
+    return { id, name: String(profile.display_name ?? entry.title ?? `Agent ${id}`) };
+  });
+  const cursor = typeof record.next_cursor === "string" ? record.next_cursor : null;
+  const next = record.has_more === true && cursor ? { cursor } : null;
+  return { items, next, fingerprint: fingerprint(items.map((item) => String(item.id))) };
+}
+
+function normalizePredictionsPage(raw: unknown, offset: number): ApiPage<AgentPrediction> {
+  const record = asRecord(raw, "Predictions");
+  const items = asArray(record.items, "Prediction items").map((item) => {
+    const entry = asRecord(item, "Prediction item");
+    const predictionId = String(entry.prediction_id ?? "");
+    const opinionId = Number(entry.opinion_id);
+    const createdAt = String(entry.created_at ?? entry.opinion_created_at ?? "");
+    if (!predictionId || !Number.isInteger(opinionId) || opinionId <= 0 || !createdAt) {
+      throw new Error("Invalid prediction identity");
+    }
+    return { predictionId, opinionId, createdAt };
+  });
+  const summary = asRecord(record.summary ?? {}, "Prediction summary");
+  const total = Number(summary.total ?? items.length);
+  const consumed = offset + items.length;
+  const next = items.length > 0 && Number.isFinite(total) && consumed < total
+    ? { offset: consumed }
+    : null;
+  return {
+    items,
+    next,
+    fingerprint: fingerprint(items.map((item) => item.predictionId)),
+  };
+}
+
+function asRecord(value: unknown, label: string): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function asArray(value: unknown, label: string): unknown[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value;
+}
+
+function fingerprint(ids: string[]): string {
+  if (ids.length === 0) return "empty";
+  return `${ids[0]}:${ids.at(-1)}:${ids.length}`;
 }

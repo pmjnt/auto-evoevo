@@ -1,0 +1,25 @@
+{
+  "feed_gen": "2026-06-20T08:00:00Z",
+  "items": [
+    {
+      "id": "3314",
+      "type": "agent",
+      "status": "active",
+      "agent_profile": {
+        "agent_id": 3314,
+        "display_name": "Source A"
+      }
+    },
+    {
+      "id": "60062",
+      "type": "agent",
+      "status": "active",
+      "agent_profile": {
+        "agent_id": 60062,
+        "display_name": "Source B"
+      }
+    }
+  ],
+  "has_more": true,
+  "next_cursor": "cursor-page-2"
+}

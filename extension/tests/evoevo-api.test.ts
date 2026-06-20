@@ -1,8 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
-import { EvoEvoApiClient, EvoEvoAuthError } from "../src/background/evoevo-api.js";
+import { readFileSync } from "node:fs";
+import {
+  EvoEvoApiClient,
+  EvoEvoAuthError,
+  EvoEvoHttpError,
+} from "../src/background/evoevo-api.js";
 
 const ADDR = "0x373226eb7ec2458a41520d3a375dbf82cc1e1c4c";
 const TOKEN = "header.payload.signature";
+const squareFixture = JSON.parse(
+  readFileSync(new URL("./fixtures/square-feed-page.json", import.meta.url), "utf8"),
+) as unknown;
+const predictionsFixture = JSON.parse(
+  readFileSync(new URL("./fixtures/agent-predictions-page.json", import.meta.url), "utf8"),
+) as unknown;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -90,6 +101,54 @@ describe("EvoEvoApiClient", () => {
     );
   });
 
+  it("normalizes a Square agent page and cursor", async () => {
+    const fetchFn = vi.fn(async (called: string) => {
+      if (called.endsWith("/v1/auth/nonce")) return jsonResponse({ message: "m", nonce: "n" });
+      if (called.endsWith("/v1/auth/login")) {
+        return jsonResponse({ token: TOKEN, expires_at: "3026-01-01T00:00:00Z" });
+      }
+      expect(called).toContain("/v1/square/feed?");
+      return jsonResponse(squareFixture);
+    }) as unknown as typeof fetch;
+    const client = new EvoEvoApiClient({ fetchFn });
+    await client.ensureAuth(ADDR, async () => "0xsig");
+
+    const page = await client.listSquareAgents({ chainId: 16661, limit: 2 });
+
+    expect(page.items).toEqual([
+      { id: 3314, name: "Source A" },
+      { id: 60062, name: "Source B" },
+    ]);
+    expect(page.next).toEqual({ cursor: "cursor-page-2" });
+  });
+
+  it("normalizes prediction IDs and advances by offset", async () => {
+    const fetchFn = vi.fn(async (called: string) => {
+      if (called.endsWith("/v1/auth/nonce")) return jsonResponse({ message: "m", nonce: "n" });
+      if (called.endsWith("/v1/auth/login")) {
+        return jsonResponse({ token: TOKEN, expires_at: "3026-01-01T00:00:00Z" });
+      }
+      expect(called).toContain("/v1/agents/3314/predictions?");
+      return jsonResponse(predictionsFixture);
+    }) as unknown as typeof fetch;
+    const client = new EvoEvoApiClient({ fetchFn });
+    await client.ensureAuth(ADDR, async () => "0xsig");
+
+    const page = await client.listAgentPredictions({
+      sourceAgentId: 3314,
+      chainId: 16661,
+      limit: 2,
+      offset: 0,
+    });
+
+    expect(page.items[0]).toEqual({
+      predictionId: "859",
+      opinionId: 4325811,
+      createdAt: "2026-06-17T09:13:26.761736+08:00",
+    });
+    expect(page.next).toEqual({ offset: 2 });
+  });
+
   it("memoryFromOpinion posts the opinion id and returns the signed payload", async () => {
     let captured: { url: string; body: string } | null = null;
     const fetchFn = vi.fn(async (called: string, init?: RequestInit) => {
@@ -149,5 +208,44 @@ describe("EvoEvoApiClient", () => {
       EvoEvoAuthError,
     );
     expect(client.isAuthed()).toBe(false);
+  });
+
+  it("re-authenticates once when a request returns 401", async () => {
+    let loginCount = 0;
+    let protectedCount = 0;
+    const fetchFn = vi.fn(async (called: string) => {
+      if (called.endsWith("/v1/auth/nonce")) return jsonResponse({ message: "m", nonce: "n" });
+      if (called.endsWith("/v1/auth/login")) {
+        loginCount += 1;
+        return jsonResponse({ token: `${TOKEN}-${loginCount}`, expires_at: "3026-01-01T00:00:00Z" });
+      }
+      protectedCount += 1;
+      if (protectedCount === 1) return new Response("expired", { status: 401 });
+      return jsonResponse([]);
+    }) as unknown as typeof fetch;
+    const client = new EvoEvoApiClient({ fetchFn });
+    await client.ensureAuth(ADDR, async () => "0xsig");
+
+    await expect(client.listAgents(ADDR, 16661)).resolves.toEqual([]);
+    expect(loginCount).toBe(2);
+  });
+
+  it("throws a retryable typed error after exhausted 429 retries", async () => {
+    const sleep = vi.fn(async () => undefined);
+    const fetchFn = vi.fn(async (called: string) => {
+      if (called.endsWith("/v1/auth/nonce")) return jsonResponse({ message: "m", nonce: "n" });
+      if (called.endsWith("/v1/auth/login")) {
+        return jsonResponse({ token: TOKEN, expires_at: "3026-01-01T00:00:00Z" });
+      }
+      return new Response("busy", { status: 429 });
+    }) as unknown as typeof fetch;
+    const client = new EvoEvoApiClient({ fetchFn, sleep, random: () => 0 });
+    await client.ensureAuth(ADDR, async () => "0xsig");
+
+    await expect(client.listAgents(ADDR, 16661)).rejects.toMatchObject({
+      status: 429,
+      retryable: true,
+    } satisfies Partial<EvoEvoHttpError>);
+    expect(sleep).toHaveBeenCalledTimes(3);
   });
 });
