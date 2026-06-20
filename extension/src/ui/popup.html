@@ -7,81 +7,70 @@
     * { box-sizing: border-box; }
     :root {
       color-scheme: dark;
-      --bg: #0b0b0a;
-      --field: #0f0d0a;
-      --border: #352a1f;
-      --border-soft: rgba(255, 126, 31, .20);
-      --text: #fff7ed;
-      --muted: #b9a895;
-      --soft: #ead7c2;
-      --orange: #ff7a1a;
-      --orange-2: #ffad32;
+      --bg: #0c0d0e;
+      --panel: #111315;
+      --panel-2: #16191c;
+      --field: #0f1113;
+      --border: #2a2f35;
+      --border-strong: #3b444d;
+      --text: #f4f1ea;
+      --muted: #9ca6ad;
+      --soft: #c9d0d5;
+      --accent: #f28c38;
+      --accent-2: #ffb067;
       --green: #65d18f;
-      --yellow: #ffd166;
-      --red: #ff6b6b;
+      --yellow: #f2c94c;
+      --red: #ef6461;
     }
     body {
       width: 380px;
       margin: 0;
-      padding: 14px;
+      padding: 12px;
       overflow-x: hidden;
-      background:
-        radial-gradient(circle at 0% 0%, rgba(255, 122, 26, .14), transparent 36%),
-        var(--bg);
+      background: var(--bg);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
     }
     .popup {
       overflow: hidden;
-      border: 1px solid rgba(255, 126, 31, .28);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      background: linear-gradient(180deg, rgba(24, 19, 14, .98), rgba(13, 11, 9, .98));
-      box-shadow: 0 24px 70px rgba(0, 0, 0, .42);
+      background: var(--panel);
     }
     .topbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 14px;
-      border-bottom: 1px solid var(--border-soft);
-      background: linear-gradient(90deg, rgba(255, 122, 26, .13), rgba(255, 173, 50, .06), transparent);
-    }
-    .logo {
       display: grid;
-      width: 40px;
-      height: 40px;
-      place-items: center;
-      flex: 0 0 auto;
-      border: 1px solid rgba(255, 126, 31, .20);
-      border-radius: 8px;
-      background: #15120f;
-      box-shadow: 0 10px 22px rgba(255, 122, 26, .13);
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      background: #121518;
     }
-    .logo svg { width: 33px; height: 19px; display: block; }
-    h1, p { margin: 0; }
-    h1 { font-size: 15px; line-height: 1.1; }
-    .sub { margin-top: 3px; color: var(--muted); font-size: 12px; }
-    .badge {
-      margin-left: auto;
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 16px; line-height: 1.15; }
+    .sub { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .status-pill {
+      align-self: start;
+      min-width: 68px;
       padding: 4px 8px;
-      border: 1px solid rgba(255, 126, 31, .45);
-      border-radius: 999px;
-      background: rgba(255, 126, 31, .10);
-      color: #ffb06a;
+      border: 1px solid var(--border-strong);
+      border-radius: 7px;
+      color: var(--soft);
       font-size: 11px;
-      font-weight: 850;
-      white-space: nowrap;
+      font-weight: 750;
+      text-align: center;
+      text-transform: lowercase;
     }
-    .body { padding: 14px; }
+    .body { padding: 12px; }
+    section { display: none; }
+    section.active { display: block; }
     label { display: block; margin-bottom: 4px; color: var(--soft); font-size: 11px; }
-    .hint { color: #9b8066; font-size: 10px; }
-    .field-label { display: flex; justify-content: space-between; gap: 8px; }
     input, select, button { font: inherit; }
     .input, select {
       width: 100%;
       min-width: 0;
-      height: 36px;
-      padding: 8px 10px;
+      height: 34px;
+      padding: 7px 9px;
       border: 1px solid var(--border);
       border-radius: 7px;
       outline: none;
@@ -90,54 +79,69 @@
       font: 650 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
     }
     .input:focus, select:focus {
-      border-color: var(--orange);
-      box-shadow: 0 0 0 3px rgba(255, 122, 26, .14);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(242, 140, 56, .18);
     }
     .btn {
-      min-height: 34px;
-      padding: 0 12px;
-      border: 0;
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--border-strong);
       border-radius: 7px;
-      background: linear-gradient(135deg, var(--orange), var(--orange-2));
-      color: #160b04;
+      background: #1d2226;
+      color: var(--text);
       cursor: pointer;
-      font-weight: 850;
-      font-size: 12px;
+      font-weight: 750;
+      font-size: 11px;
       white-space: nowrap;
-      box-shadow: 0 10px 22px rgba(255, 122, 26, .22);
     }
-    .btn.ghost {
-      border: 1px solid #5a4330;
-      background: transparent;
-      color: var(--soft);
-      box-shadow: none;
+    .btn.primary {
+      border-color: rgba(242, 140, 56, .72);
+      background: var(--accent);
+      color: #181008;
     }
-    .btn.small { min-height: 28px; padding: 0 10px; font-size: 11px; }
-    .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 10px; }
-    .row.between { justify-content: space-between; }
-    .row.split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .row.split > .field { min-width: 0; }
-    .stats {
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: .52;
+    }
+    button:focus-visible,
+    summary:focus-visible,
+    .refresh-link:focus-visible,
+    .toggle-row label.tog input:focus-visible + .toggle-track {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--accent); }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .button-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 8px;
       margin-top: 10px;
     }
+    .button-grid .wide { grid-column: span 2; }
     .address {
       overflow: hidden;
       color: var(--soft);
-      font: 750 12px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+      font: 720 11px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .stat {
-      min-width: 0;
-      padding: 8px 10px;
-      border: 1px solid rgba(255, 126, 31, .18);
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      margin-top: 10px;
+      border: 1px solid var(--border);
       border-radius: 7px;
-      background: rgba(13, 11, 9, .72);
+      background: var(--border);
     }
-    .stat span {
+    .metric {
+      min-width: 0;
+      padding: 8px 9px;
+      background: var(--panel-2);
+    }
+    .metric span {
       display: block;
       overflow: hidden;
       color: var(--muted);
@@ -145,138 +149,162 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .stat strong { display: block; margin-top: 2px; font-size: 15px; line-height: 1.1; }
-    #status-text { color: var(--green); }
+    .metric strong { display: block; margin-top: 2px; font-size: 15px; line-height: 1.1; }
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-top: 12px;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--field);
+    }
+    .tab {
+      min-height: 28px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 760;
+    }
+    .tab.active {
+      background: #242a2f;
+      color: var(--text);
+    }
+    .tab:hover { color: var(--text); }
+    .panel {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .panel h2, details > summary {
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+    .field { margin-top: 8px; }
+    .field-label { display: flex; justify-content: space-between; gap: 8px; }
+    .hint { color: var(--muted); font-size: 10px; }
+    .refresh-link { color: var(--accent-2); text-decoration: none; cursor: pointer; }
+    .row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 10px; }
+    .row.split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .msg {
       min-height: 14px;
       margin-top: 8px;
       color: var(--muted);
       font-size: 10px;
       line-height: 1.35;
+      white-space: pre-line;
     }
     .msg.err { color: var(--red); }
     .msg.ok { color: var(--green); }
-    section { display: none; }
-    section.active { display: block; }
-    .config-section {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border-soft);
+    details {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
     }
-    .config-section > h3 {
-      margin: 0 0 8px;
-      color: var(--soft);
-      font-size: 11px;
-      font-weight: 850;
-      letter-spacing: .03em;
-      text-transform: uppercase;
-    }
-    .field { margin-bottom: 8px; }
+    summary { cursor: pointer; }
+    summary:hover { color: var(--text); }
     .toggle-row {
-      display: flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr auto;
       gap: 10px;
-      margin: 10px 0 4px;
-      padding: 10px;
-      border: 1px solid var(--border-soft);
-      border-radius: 7px;
-      background: rgba(13, 11, 9, .72);
+      align-items: center;
+      margin-top: 8px;
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
     }
     .toggle-row strong { display: block; font-size: 12px; }
     .toggle-row span { display: block; color: var(--muted); font-size: 10px; }
-    .toggle-row label.tog {
-      position: relative; flex: 0 0 auto;
-      width: 38px; height: 22px; margin: 0; cursor: pointer;
-    }
-    .toggle-row label.tog input {
-      position: absolute; inset: 0; width: 38px; height: 22px; margin: 0; opacity: 0;
-    }
-    .toggle-track {
-      display: block; width: 38px; height: 22px;
-      border-radius: 999px; background: #3b2a1d;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
-      transition: background .16s ease;
-    }
+    .toggle-row label.tog { position: relative; width: 38px; height: 22px; margin: 0; cursor: pointer; }
+    .toggle-row label.tog input { position: absolute; inset: 0; width: 38px; height: 22px; margin: 0; opacity: 0; }
+    .toggle-track { display: block; width: 38px; height: 22px; border-radius: 999px; background: #343b42; }
     .toggle-track::after {
       content: ""; position: absolute; top: 3px; left: 3px;
       width: 16px; height: 16px; border-radius: 50%;
-      background: #fff7ed; transition: transform .16s ease;
+      background: var(--text); transition: transform .16s ease;
     }
-    .toggle-row label.tog input:checked + .toggle-track {
-      background: linear-gradient(135deg, var(--orange), var(--orange-2));
-    }
+    .toggle-row label.tog input:checked + .toggle-track { background: var(--accent); }
     .toggle-row label.tog input:checked + .toggle-track::after { transform: translateX(16px); }
-    .refresh-link { color: var(--orange); text-decoration: none; cursor: pointer; }
-    .refresh-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <main class="popup">
     <header class="topbar">
-      <div class="logo">
-        <svg viewBox="0 0 88 34" aria-hidden="true">
-          <path d="M4 20C13 6 24 6 44 20C64 34 75 34 84 20" fill="none" stroke="#ff7a1a" stroke-width="5.2" stroke-linecap="round" />
-          <path d="M4 20C13 34 24 34 44 20C64 6 75 6 84 20" fill="none" stroke="#ff7a1a" stroke-width="5.2" stroke-linecap="round" />
-          <path d="M8 19C17 10 26 10 42 20" fill="none" stroke="#ffad32" stroke-width="2" stroke-linecap="round" opacity=".75" />
-        </svg>
-      </div>
       <div>
         <h1>Auto EvoEvo</h1>
-        <p class="sub">Direct-API signer · 0G</p>
+        <p class="sub" id="workflow-subtitle">0G workspace</p>
       </div>
-      <div class="badge">0G</div>
+      <div class="status-pill" id="status-text">idle</div>
     </header>
 
     <div class="body">
-      <!-- SETUP VIEW (shown when no private key is loaded) -->
       <section id="setup">
         <label for="setupPrivateKey">Private key</label>
         <input id="setupPrivateKey" class="input" type="password" placeholder="0x..." autocomplete="off" />
         <div class="row">
-          <button id="saveKey" class="btn">Save key</button>
+          <button id="saveKey" class="btn primary">Save key</button>
         </div>
         <div id="setup-msg" class="msg"></div>
-        <div class="msg" style="margin-top:14px;font-size:11px;line-height:1.5;color:var(--muted)">
-          The key is stored as plaintext in this Chrome profile's storage.
-          No password gate. Use a burner wallet only.
-        </div>
+        <div class="msg">The key is stored as plaintext in this Chrome profile. Use a burner wallet only.</div>
       </section>
 
-      <!-- READY VIEW: status + config -->
       <section id="ready">
         <div class="address" id="address"></div>
-        <div class="stats">
-          <div class="stat"><span>Status</span><strong id="status-text">idle</strong></div>
-          <div class="stat"><span>Signed</span><strong id="signed">0</strong></div>
-          <div class="stat"><span>Dry-run</span><strong id="dry">0</strong></div>
-          <div class="stat"><span>Manual</span><strong id="manual">0</strong></div>
-          <div class="stat"><span>Rejected</span><strong id="rejected">0</strong></div>
-          <div class="stat"><span>Reverted</span><strong id="reverted">0</strong></div>
+        <div class="metrics">
+          <div class="metric"><span>Active</span><strong id="active-workflow">none</strong></div>
+          <div class="metric"><span>Next run</span><strong id="next-run">-</strong></div>
+          <div class="metric"><span>Signed</span><strong id="signed">0</strong></div>
+          <div class="metric"><span>Failed</span><strong id="failed">0</strong></div>
         </div>
-        <div class="row">
-          <button id="pause" class="btn ghost">Pause</button>
-          <button id="start" class="btn">Start</button>
+
+        <div class="button-grid">
+          <button id="runFeed" class="btn">Run Feed</button>
+          <button id="runPredictions" class="btn">Run Predictions</button>
+          <button id="runBoth" class="btn primary wide">Run Both</button>
+          <button id="pause" class="btn wide">Pause</button>
         </div>
         <div id="start-msg" class="msg"></div>
-        <div id="event-log" class="msg" style="max-height:60px;overflow-y:auto;white-space:pre-line;margin-top:4px"></div>
+        <div id="event-log" class="msg" style="max-height:60px;overflow-y:auto"></div>
 
-        <!-- AGENT -->
-        <div class="config-section">
-          <h3>Agent</h3>
+        <div class="tabs" role="tablist" aria-label="Workflow view">
+          <button id="tabFeed" class="tab active" role="tab" aria-selected="true">Feed</button>
+          <button id="tabPredictions" class="tab" role="tab" aria-selected="false">Predictions</button>
+        </div>
+
+        <section id="feed-panel" class="panel active" role="tabpanel">
+          <h2>Feed</h2>
+          <div class="metrics">
+            <div class="metric"><span>Owned agents</span><strong id="owned-agents">0</strong></div>
+            <div class="metric"><span>Completed</span><strong id="feed-completed">0</strong></div>
+          </div>
+        </section>
+
+        <section id="predictions-panel" class="panel" role="tabpanel">
+          <h2>Predictions</h2>
           <div class="field">
             <div class="field-label">
-              <label for="agentId">Active agent</label>
+              <label for="agentId">Target agent</label>
               <span class="hint"><a class="refresh-link" id="loadAgents">Refresh</a></span>
             </div>
             <select id="agentId">
-              <option value="0">— Refresh to load —</option>
+              <option value="0">Refresh to load</option>
             </select>
           </div>
-        </div>
+          <div class="metrics">
+            <div class="metric"><span>Sources</span><strong id="source-agents">0</strong></div>
+            <div class="metric"><span>Scanned</span><strong id="predictions-scanned">0</strong></div>
+            <div class="metric"><span>Added</span><strong id="predictions-added">0</strong></div>
+            <div class="metric"><span>Skipped</span><strong id="predictions-skipped">0</strong></div>
+          </div>
+        </section>
 
-        <!-- NETWORK -->
-        <div class="config-section">
-          <h3>Network</h3>
+        <details>
+          <summary>Advanced</summary>
           <div class="field">
             <label for="rpcUrl">0G RPC URL</label>
             <input id="rpcUrl" class="input" placeholder="https://evmrpc.0g.ai" />
@@ -291,33 +319,29 @@
               <input id="maxFeeNative" class="input" type="text" placeholder="0.01" />
             </div>
           </div>
-          <div class="field">
-            <div class="field-label">
-              <label for="gasPriceJitterPercent">Gas jitter (%)</label>
-              <span class="hint">0-100, default 10</span>
+          <div class="row split">
+            <div class="field">
+              <label for="repeatIntervalMinutes">Repeat (min)</label>
+              <input id="repeatIntervalMinutes" class="input" type="number" min="30" max="1440" />
             </div>
+            <div class="field">
+              <label for="reconciliationIntervalMinutes">Full scan (min)</label>
+              <input id="reconciliationIntervalMinutes" class="input" type="number" min="30" max="1440" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="gasPriceJitterPercent">Gas jitter (%)</label>
             <input id="gasPriceJitterPercent" class="input" type="number" min="0" max="100" step="1" />
           </div>
-        </div>
-
-        <!-- GUARDRAILS -->
-        <div class="config-section">
-          <h3>Guardrails</h3>
           <div class="field">
-            <div class="field-label">
-              <label for="allowedContracts">Allowed contracts</label>
-              <span class="hint">comma-separated</span>
-            </div>
+            <label for="allowedContracts">Allowed contracts</label>
             <input id="allowedContracts" class="input" />
           </div>
           <div class="field">
-            <div class="field-label">
-              <label for="allowedFunctionSelectors">Allowed selectors</label>
-              <span class="hint">4 bytes hex</span>
-            </div>
+            <label for="allowedFunctionSelectors">Allowed selectors</label>
             <input id="allowedFunctionSelectors" class="input" />
           </div>
-          <label class="toggle-row" for="dryRun">
+          <div class="toggle-row">
             <span>
               <strong>Dry-run mode</strong>
               <span>Preview without signing</span>
@@ -326,46 +350,27 @@
               <input type="checkbox" id="dryRun" checked />
               <span class="toggle-track"></span>
             </label>
-          </label>
-        </div>
-
-        <!-- LOOP -->
-        <div class="config-section">
-          <h3>Loop</h3>
+          </div>
           <div class="row split">
             <div class="field">
-              <div class="field-label">
-                <label for="cooldownSeconds">Cooldown (s)</label>
-                <span class="hint">0–300</span>
-              </div>
+              <label for="cooldownSeconds">Cooldown (s)</label>
               <input id="cooldownSeconds" class="input" type="number" min="0" max="300" />
             </div>
             <div class="field">
-              <div class="field-label">
-                <label for="stopAtRemaining">Stop at remaining</label>
-                <span class="hint">0 = drain</span>
-              </div>
+              <label for="stopAtRemaining">Stop at remaining</label>
               <input id="stopAtRemaining" class="input" type="number" min="0" max="1000" />
             </div>
           </div>
-        </div>
-
-        <!-- WALLET -->
-        <div class="config-section">
-          <h3>Wallet</h3>
           <div class="field">
-            <label>Address</label>
+            <label>Wallet address</label>
             <input id="walletAddress" class="input" type="text" readonly />
           </div>
           <div class="row">
-            <button id="clearKey" class="btn ghost small">Remove key</button>
+            <button id="clearKey" class="btn">Remove key</button>
+            <button id="save" class="btn primary">Save settings</button>
           </div>
-        </div>
-
-        <div class="row">
-          <button id="save" class="btn">Save settings</button>
-        </div>
-        <div id="save-msg" class="msg"></div>
+          <div id="save-msg" class="msg"></div>
+        </details>
       </section>
     </div>
   </main>
