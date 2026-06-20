@@ -25,6 +25,8 @@ const baseConfig: ExtensionConfig = {
   gasPriceJitterPercent: 10,
   dryRun: false,
   cooldownSeconds: 0,
+  memoryApiCooldownSeconds: 1,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 8359,
   repeatIntervalMinutes: 120,

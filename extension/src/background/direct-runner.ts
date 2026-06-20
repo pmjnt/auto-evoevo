@@ -192,6 +192,10 @@ export async function runFeedForAgent(
         continue;
       }
 
+      if (outcome.kind === "rate_limited") {
+        return { kind: "rate_limited", retryAfterMs: outcome.retryAfterMs };
+      }
+
       // Hard failure (reverted, rpc_failed, guard reject): stop the loop.
       deps.onEvent({ type: "paused", reason: outcome.reason });
         return { kind: "failed", reason: outcome.reason, global: outcome.kind === "ambiguous" };

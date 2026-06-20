@@ -23,6 +23,8 @@ describe("background router (no password)", () => {
       gasPriceJitterPercent: 10,
       dryRun: true,
       cooldownSeconds: 0,
+      memoryApiCooldownSeconds: 1,
+      rateLimitBackoffMinutes: 15,
       stopAtRemaining: 0,
       agentId: 0,
       repeatIntervalMinutes: 120,
