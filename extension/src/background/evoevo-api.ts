@@ -285,10 +285,12 @@ export class EvoEvoApiClient {
       }
       if (!response.ok) {
         const text = await response.text().catch(() => "");
+        const responseBody = parseErrorBody(text);
         throw new EvoEvoHttpError(
           `EvoEvo API ${method} ${url} -> ${response.status} ${response.statusText}: ${text.slice(0, 200)}`,
           response.status,
           retryable,
+          responseBody,
         );
       }
       return (await response.json()) as T;
@@ -313,9 +315,27 @@ export class EvoEvoHttpError extends Error {
     message: string,
     readonly status: number | null,
     readonly retryable: boolean,
+    readonly responseBody: unknown = null,
   ) {
     super(message);
     this.name = "EvoEvoHttpError";
+  }
+}
+
+export function isAlreadyAdoptedError(error: unknown): boolean {
+  if (!(error instanceof EvoEvoHttpError) || error.status !== 409) return false;
+  const body = error.responseBody;
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return false;
+  const value = (body as Record<string, unknown>)["error"];
+  return typeof value === "string" && value.trim().toLowerCase() === "already adopted";
+}
+
+function parseErrorBody(text: string): unknown {
+  if (text.length === 0) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
   }
 }
 

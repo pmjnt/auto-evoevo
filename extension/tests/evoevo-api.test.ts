@@ -4,6 +4,7 @@ import {
   EvoEvoApiClient,
   EvoEvoAuthError,
   EvoEvoHttpError,
+  isAlreadyAdoptedError,
 } from "../src/background/evoevo-api.js";
 
 const ADDR = "0x373226eb7ec2458a41520d3a375dbf82cc1e1c4c";
@@ -193,6 +194,47 @@ describe("EvoEvoApiClient", () => {
     expect(result.reasoning_intake_with_sig.identity_registry_address).toBe(
       "0x8004Ae533a0301CbD7508373b663756D26DfB028",
     );
+  });
+
+  it("classifies an exact 409 already adopted response", async () => {
+    const fetchFn = vi.fn(async (called: string) => {
+      if (called.endsWith("/v1/auth/nonce")) {
+        return jsonResponse({ message: "m", nonce: "n" });
+      }
+      if (called.endsWith("/v1/auth/login")) {
+        return jsonResponse({
+          token: TOKEN,
+          expires_at: "3026-01-01T00:00:00Z",
+        });
+      }
+      return jsonResponse({ error: "already adopted" }, 409);
+    }) as unknown as typeof fetch;
+    const client = new EvoEvoApiClient({ fetchFn });
+    await client.ensureAuth(ADDR, async () => "0xsig");
+
+    let captured: unknown;
+    try {
+      await client.memoryFromOpinion(8359, 4325811);
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(isAlreadyAdoptedError(captured)).toBe(true);
+    expect(captured).toMatchObject({
+      status: 409,
+      retryable: false,
+      responseBody: { error: "already adopted" },
+    });
+  });
+
+  it("does not classify other 409 responses as already adopted", () => {
+    const error = new EvoEvoHttpError(
+      "conflict",
+      409,
+      false,
+      { error: "nonce conflict" },
+    );
+    expect(isAlreadyAdoptedError(error)).toBe(false);
   });
 
   it("throws EvoEvoAuthError on 401 and clears cached auth", async () => {
