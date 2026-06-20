@@ -73,6 +73,7 @@ export type AgentPrediction = {
   predictionId: string;
   opinionId: number;
   createdAt: string;
+  viewerHasIntaken: boolean;
 };
 
 // Allows the EvoEvoApiClient to persist its JWT outside of instance
@@ -370,7 +371,15 @@ function normalizePredictionsPage(raw: unknown, limit: number): ApiPage<AgentPre
     ) {
       throw new Error("Invalid prediction identity");
     }
-    return { cursorId, prediction: { predictionId, opinionId, createdAt } };
+    return {
+      cursorId,
+      prediction: {
+        predictionId,
+        opinionId,
+        createdAt,
+        viewerHasIntaken: entry.viewer_has_intaken === true,
+      },
+    };
   });
   const items = normalized.map((item) => item.prediction);
   const lastCursor = normalized.at(-1)?.cursorId;

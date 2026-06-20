@@ -125,6 +125,7 @@ describe("EvoEvoApiClient", () => {
 
   it("normalizes prediction IDs and advances by before cursor", async () => {
     const calls: string[] = [];
+    const fixture = predictionsFixture as { items: Record<string, unknown>[] };
     const fetchFn = vi.fn(async (called: string) => {
       if (called.endsWith("/v1/auth/nonce")) return jsonResponse({ message: "m", nonce: "n" });
       if (called.endsWith("/v1/auth/login")) {
@@ -132,7 +133,13 @@ describe("EvoEvoApiClient", () => {
       }
       calls.push(called);
       expect(called).toContain("/v1/agents/3314/predictions?");
-      return jsonResponse(predictionsFixture);
+      return jsonResponse({
+        ...fixture,
+        items: [
+          { ...fixture.items[0], viewer_has_intaken: true },
+          ...fixture.items.slice(1),
+        ],
+      });
     }) as unknown as typeof fetch;
     const client = new EvoEvoApiClient({ fetchFn });
     await client.ensureAuth(ADDR, async () => "0xsig");
@@ -148,6 +155,7 @@ describe("EvoEvoApiClient", () => {
       predictionId: "859",
       opinionId: 4325811,
       createdAt: "2026-06-17T09:13:26.761736+08:00",
+      viewerHasIntaken: true,
     });
     expect(calls[0]).toContain("before=358914");
     expect(calls[0]).not.toContain("offset=");

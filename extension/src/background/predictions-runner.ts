@@ -137,12 +137,26 @@ async function processSource(
       if (deps.isPaused()) return { kind: "paused" };
       await deps.onProgress({ scannedDelta: 1 });
       if (await deps.registry.has(prediction.predictionId)) continue;
-      sawUnknown = true;
       const context = {
         sourceAgentId: args.sourceAgentId,
         targetAgentId: args.targetAgentId,
         predictionId: prediction.predictionId,
       };
+      if (prediction.viewerHasIntaken) {
+        await deps.registry.complete(prediction.predictionId);
+        await deps.onProgress({
+          skippedDelta: 1,
+          activity: {
+            type: "prediction",
+            phase: "skipped",
+            ...context,
+            reason: "viewer_has_intaken",
+          },
+        });
+        continue;
+      }
+
+      sawUnknown = true;
       await deps.onProgress({
         activity: { type: "prediction", phase: "submitting", ...context },
       });
@@ -249,6 +263,7 @@ async function processDueRetries(deps: PredictionsRunnerDeps): Promise<RunnerRes
         predictionId: item.predictionId,
         opinionId: item.opinionId,
         createdAt: "",
+        viewerHasIntaken: false,
       },
     );
     if (outcome.kind === "approved") {

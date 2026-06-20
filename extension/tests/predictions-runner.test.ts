@@ -14,10 +14,15 @@ import type { PredictionRegistry } from "../src/background/prediction-registry.j
 import type { SubmitOutcome } from "../src/background/intake-submitter.js";
 import type { WorkflowState } from "../src/shared/types.js";
 
-const prediction = (predictionId: string, opinionId = Number(predictionId.replace(/\D/g, "")) || 1): AgentPrediction => ({
+const prediction = (
+  predictionId: string,
+  opinionId = Number(predictionId.replace(/\D/g, "")) || 1,
+  viewerHasIntaken = false,
+): AgentPrediction => ({
   predictionId,
   opinionId,
   createdAt: "2026-06-20T00:00:00Z",
+  viewerHasIntaken,
 });
 
 const page = <T>(items: T[], next: PageRequest | null): ApiPage<T> => ({
@@ -176,6 +181,42 @@ describe("Predictions runner", () => {
         phase: "confirmed",
         txHash: "0xfresh",
       }),
+    }));
+  });
+
+  it("skips predictions already intaken by the viewer without submitting", async () => {
+    const setup = harness();
+    setup.predictionPages.set(3314, [
+      page([prediction("already-viewed", 1, true), prediction("fresh", 2)], null),
+    ]);
+    const updates: PredictionProgressUpdate[] = [];
+    setup.deps.onProgress = vi.fn(async (update) => { updates.push(update); });
+    setup.deps.submitPrediction = vi.fn(async (
+      _sourceAgentId: number,
+      _targetAgentId: number,
+      item: AgentPrediction,
+    ) => {
+      setup.submitted.push(item.predictionId);
+      return { kind: "approved" as const, txHash: `0x${item.opinionId}` };
+    });
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.deps.submitPrediction).toHaveBeenCalledTimes(1);
+    expect(setup.submitted).toEqual(["fresh"]);
+    expect(await setup.deps.registry.has("already-viewed")).toBe(true);
+    expect(updates).toContainEqual(expect.objectContaining({
+      skippedDelta: 1,
+      activity: {
+        type: "prediction",
+        phase: "skipped",
+        sourceAgentId: 3314,
+        targetAgentId: 900,
+        predictionId: "already-viewed",
+        reason: "viewer_has_intaken",
+      },
     }));
   });
 });
