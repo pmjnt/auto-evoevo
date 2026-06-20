@@ -23,6 +23,7 @@ export type WorkflowCoordinatorDeps = {
 export class WorkflowCoordinator {
   private running: Promise<void> | null = null;
   private readonly now: () => number;
+  private pauseRequested = false;
 
   constructor(private readonly deps: WorkflowCoordinatorDeps) {
     this.now = deps.now ?? Date.now;
@@ -36,6 +37,7 @@ export class WorkflowCoordinator {
     state.nextRunAt = null;
     state.lastError = null;
     await this.deps.setState(state);
+    this.pauseRequested = false;
     this.launchCycle();
     return { started: true };
   }
@@ -46,6 +48,7 @@ export class WorkflowCoordinator {
     state.activeWorkflow = null;
     state.nextRunAt = null;
     await this.deps.setState(state);
+    this.pauseRequested = true;
     await chrome.alarms.clear(WORKFLOW_ALARM_NAME);
   }
 
@@ -72,6 +75,10 @@ export class WorkflowCoordinator {
     await this.running;
   }
 
+  isPaused(): boolean {
+    return this.pauseRequested;
+  }
+
   private launchCycle(): void {
     if (this.running !== null) return;
     this.running = this.runCycle().finally(() => {
@@ -87,6 +94,7 @@ export class WorkflowCoordinator {
     }
     let state = await this.deps.getState();
     if (state.status !== "running" || state.mode === null) return;
+    this.pauseRequested = false;
 
     if (state.mode === "feed" || state.mode === "both") {
       state.activeWorkflow = "feed";
