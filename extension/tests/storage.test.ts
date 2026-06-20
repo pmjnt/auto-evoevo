@@ -25,6 +25,8 @@ const fakeConfig: ExtensionConfig = {
   gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 0,
+  memoryApiCooldownSeconds: 1,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 0,
   repeatIntervalMinutes: 120,
@@ -72,6 +74,17 @@ describe("storage", () => {
     const {
       repeatIntervalMinutes: _repeat,
       reconciliationIntervalMinutes: _reconciliation,
+      ...oldConfig
+    } = fakeConfig;
+    await chrome.storage.local.set({ config: oldConfig });
+
+    expect(await getConfig()).toEqual(fakeConfig);
+  });
+
+  it("defaults predictions rate limit controls for old stored config", async () => {
+    const {
+      memoryApiCooldownSeconds: _memoryApiCooldownSeconds,
+      rateLimitBackoffMinutes: _rateLimitBackoffMinutes,
       ...oldConfig
     } = fakeConfig;
     await chrome.storage.local.set({ config: oldConfig });

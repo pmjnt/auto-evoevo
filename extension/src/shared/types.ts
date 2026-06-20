@@ -27,6 +27,8 @@ export type ExtensionConfig = {
   gasPriceJitterPercent: number;
   dryRun: boolean;
   cooldownSeconds: number;
+  memoryApiCooldownSeconds: number;
+  rateLimitBackoffMinutes: number;
   // Stop automation when each feed tab has fewer than this many
   // unprocessed opinions left. Lets the user leave a buffer rather than
   // draining the feed completely.

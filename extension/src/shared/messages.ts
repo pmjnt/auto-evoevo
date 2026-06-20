@@ -55,6 +55,8 @@ export const setConfigSchema = z.object({
     gasPriceJitterPercent: z.number().min(0).max(100).default(10),
     dryRun: z.boolean(),
     cooldownSeconds: z.number().int().min(0).max(300).default(0),
+    memoryApiCooldownSeconds: z.number().int().min(0).max(60).default(1),
+    rateLimitBackoffMinutes: z.number().int().min(1).max(1440).default(15),
     stopAtRemaining: z.number().int().min(0).max(1000).default(10),
     agentId: z.number().int().min(0).default(0),
     repeatIntervalMinutes: z.number().int().min(30).max(1440).default(120),

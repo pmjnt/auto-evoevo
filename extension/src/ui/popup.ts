@@ -13,6 +13,8 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 1,
+  memoryApiCooldownSeconds: 1,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 10,
   agentId: 0,
   repeatIntervalMinutes: 120,
@@ -162,6 +164,8 @@ function fillConfig(config: ExtensionConfig): void {
   setInput("allowedContracts", config.allowedContracts.join(", "));
   setInput("allowedFunctionSelectors", config.allowedFunctionSelectors.join(", "));
   setInput("cooldownSeconds", config.cooldownSeconds);
+  setInput("memoryApiCooldownSeconds", config.memoryApiCooldownSeconds);
+  setInput("rateLimitBackoffMinutes", config.rateLimitBackoffMinutes);
   setInput("stopAtRemaining", config.stopAtRemaining);
   setChecked("dryRun", config.dryRun);
 
@@ -255,6 +259,8 @@ function currentConfig(): ExtensionConfig {
     gasPriceJitterPercent: clampInt(elValue("gasPriceJitterPercent"), DEFAULT_CONFIG.gasPriceJitterPercent, 0, 100),
     dryRun: dryRunEl?.checked ?? true,
     cooldownSeconds: clampInt(elValue("cooldownSeconds"), 0, 0, 300),
+    memoryApiCooldownSeconds: clampInt(elValue("memoryApiCooldownSeconds"), DEFAULT_CONFIG.memoryApiCooldownSeconds, 0, 60),
+    rateLimitBackoffMinutes: clampInt(elValue("rateLimitBackoffMinutes"), DEFAULT_CONFIG.rateLimitBackoffMinutes, 1, 1440),
     stopAtRemaining: clampInt(elValue("stopAtRemaining"), 0, 0, 1000),
     agentId: Math.max(0, Number(elValue("agentId")) || 0),
     repeatIntervalMinutes: clampInt(elValue("repeatIntervalMinutes"), DEFAULT_CONFIG.repeatIntervalMinutes, 30, 1440),

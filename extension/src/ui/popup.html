@@ -361,6 +361,16 @@
               <input id="stopAtRemaining" class="input" type="number" min="0" max="1000" />
             </div>
           </div>
+          <div class="row split">
+            <div class="field">
+              <label for="memoryApiCooldownSeconds">Memory API cooldown (s)</label>
+              <input id="memoryApiCooldownSeconds" class="input" type="number" min="0" max="60" />
+            </div>
+            <div class="field">
+              <label for="rateLimitBackoffMinutes">Rate limit backoff (m)</label>
+              <input id="rateLimitBackoffMinutes" class="input" type="number" min="1" max="1440" />
+            </div>
+          </div>
           <div class="field">
             <label>Wallet address</label>
             <input id="walletAddress" class="input" type="text" readonly />

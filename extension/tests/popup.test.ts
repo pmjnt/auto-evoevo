@@ -27,6 +27,8 @@ const config = {
   gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 0,
+  memoryApiCooldownSeconds: 1,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 0,
   repeatIntervalMinutes: 120,
@@ -106,5 +108,13 @@ describe("popup workflow console", () => {
   it("routes workflow activity through the event formatter", () => {
     const popupSource = readFileSync(resolve("src/ui/popup.ts"), "utf8");
     expect(popupSource).toContain("formatWorkflowEvent(event)");
+  });
+
+  it("exposes predictions rate limit controls", () => {
+    const popupSource = readFileSync(resolve("src/ui/popup.ts"), "utf8");
+    expect(popupHtml).toContain('id="memoryApiCooldownSeconds"');
+    expect(popupHtml).toContain('id="rateLimitBackoffMinutes"');
+    expect(popupSource).toContain("memoryApiCooldownSeconds: clampInt");
+    expect(popupSource).toContain("rateLimitBackoffMinutes: clampInt");
   });
 });
