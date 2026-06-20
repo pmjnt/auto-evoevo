@@ -190,6 +190,11 @@ export async function runFeedForAgent(
         continue;
       }
 
+      if (outcome.kind === "already_adopted") {
+        if (cooldownMs > 0) await sleep(cooldownMs);
+        continue;
+      }
+
       // Hard failure (reverted, rpc_failed, guard reject): stop the loop.
       deps.onEvent({ type: "paused", reason: outcome.reason });
         return { kind: "failed", reason: outcome.reason, global: outcome.kind === "ambiguous" };

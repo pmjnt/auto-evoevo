@@ -43,6 +43,19 @@ export type WorkflowName = "feed" | "predictions";
 export type WorkflowStatus = "idle" | "running" | "paused" | "error";
 export type FeedTabName = "recommended" | "weekly" | "monthly" | "all_time";
 
+export type PredictionActivityEvent =
+  | { type: "predictions-loading" }
+  | { type: "predictions-sources"; count: number }
+  | {
+      type: "prediction";
+      phase: "submitting" | "confirmed" | "already_adopted" | "skipped" | "failed";
+      sourceAgentId: number;
+      targetAgentId: number;
+      predictionId: string;
+      txHash?: string;
+      reason?: string;
+    };
+
 export type WorkflowCounters = {
   ownedAgents: number;
   feedAgentsCompleted: number;

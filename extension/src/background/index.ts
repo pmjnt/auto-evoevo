@@ -110,8 +110,8 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
       registry,
       checkpoint: { load: getWorkflowState, save: setWorkflowState },
       isPaused: () => coordinator.isPaused(),
-      onProgress: () => undefined,
-      submitPrediction: async (agentId, prediction) => {
+      onProgress: async () => undefined,
+      submitPrediction: async (_sourceAgentId, agentId, prediction) => {
         const memory = await evoEvoApi.memoryFromOpinion(agentId, prediction.opinionId);
         return await submitIntake(memory.reasoning_intake_with_sig, {
           config: { ...config, agentId },

@@ -8,9 +8,21 @@ import type {
 import type { SubmitOutcome } from "./intake-submitter.js";
 import type { PredictionRegistry } from "./prediction-registry.js";
 import type { RunnerResult } from "./direct-runner.js";
-import type { WorkflowCounters, WorkflowState } from "../shared/types.js";
+import type {
+  PredictionActivityEvent,
+  WorkflowState,
+} from "../shared/types.js";
 
 export type PredictionScan = "incremental" | "full";
+
+export type PredictionProgressUpdate = {
+  sourceAgents?: number;
+  scannedDelta?: number;
+  addedDelta?: number;
+  skippedDelta?: number;
+  failedDelta?: number;
+  activity?: PredictionActivityEvent;
+};
 
 export type PredictionsRunnerDeps = {
   api: Pick<
@@ -25,17 +37,12 @@ export type PredictionsRunnerDeps = {
     save: (state: WorkflowState) => Promise<void>;
   };
   submitPrediction: (
+    sourceAgentId: number,
     targetAgentId: number,
     prediction: AgentPrediction,
   ) => Promise<SubmitOutcome>;
   isPaused: () => boolean;
-  onProgress: (update: {
-    sourceAgents?: number;
-    scannedDelta?: number;
-    addedDelta?: number;
-    skippedDelta?: number;
-    failedDelta?: number;
-  }) => void;
+  onProgress: (update: PredictionProgressUpdate) => Promise<void>;
 };
 
 export async function runPredictions(
@@ -54,10 +61,14 @@ export async function runPredictions(
   const retryResult = await processDueRetries(deps);
   if (retryResult.kind !== "completed") return retryResult;
 
+  await deps.onProgress({ activity: { type: "predictions-loading" } });
   const sourceAgentIds = args.scan === "full"
     ? await collectAllSourceAgents(deps)
     : await collectIncrementalSourceAgents(deps);
-  deps.onProgress({ sourceAgents: sourceAgentIds.length });
+  await deps.onProgress({
+    sourceAgents: sourceAgentIds.length,
+    activity: { type: "predictions-sources", count: sourceAgentIds.length },
+  });
 
   for (const sourceAgentId of sourceAgentIds) {
     if (deps.isPaused()) return { kind: "paused" };
@@ -124,18 +135,56 @@ async function processSource(
 
     for (const prediction of page.items) {
       if (deps.isPaused()) return { kind: "paused" };
-      deps.onProgress({ scannedDelta: 1 });
+      await deps.onProgress({ scannedDelta: 1 });
       if (await deps.registry.has(prediction.predictionId)) continue;
       sawUnknown = true;
-      const outcome = await deps.submitPrediction(args.targetAgentId, prediction);
+      const context = {
+        sourceAgentId: args.sourceAgentId,
+        targetAgentId: args.targetAgentId,
+        predictionId: prediction.predictionId,
+      };
+      await deps.onProgress({
+        activity: { type: "prediction", phase: "submitting", ...context },
+      });
+      const outcome = await deps.submitPrediction(
+        args.sourceAgentId,
+        args.targetAgentId,
+        prediction,
+      );
       if (outcome.kind === "approved") {
         completed.push(prediction.predictionId);
-        deps.onProgress({ addedDelta: 1 });
+        await deps.onProgress({
+          addedDelta: 1,
+          activity: {
+            type: "prediction",
+            phase: "confirmed",
+            ...context,
+            txHash: outcome.txHash,
+          },
+        });
+      } else if (outcome.kind === "already_adopted") {
+        await deps.registry.complete(prediction.predictionId);
+        await deps.onProgress({
+          skippedDelta: 1,
+          activity: {
+            type: "prediction",
+            phase: "already_adopted",
+            ...context,
+          },
+        });
       } else if (outcome.kind === "dry_run") {
         continue;
       } else if (outcome.kind === "ambiguous") {
         await deps.registry.block(prediction.predictionId);
-        deps.onProgress({ failedDelta: 1 });
+        await deps.onProgress({
+          failedDelta: 1,
+          activity: {
+            type: "prediction",
+            phase: "failed",
+            ...context,
+            reason: outcome.reason,
+          },
+        });
         return { kind: "failed", reason: outcome.reason, global: true };
       } else if (outcome.retryable) {
         await deps.registry.retry({
@@ -146,10 +195,26 @@ async function processSource(
           attempts: 1,
           retryAfter: Date.now() + 30_000,
         });
-        deps.onProgress({ failedDelta: 1 });
+        await deps.onProgress({
+          failedDelta: 1,
+          activity: {
+            type: "prediction",
+            phase: "failed",
+            ...context,
+            reason: outcome.reason,
+          },
+        });
       } else {
         completed.push(prediction.predictionId);
-        deps.onProgress({ skippedDelta: 1 });
+        await deps.onProgress({
+          skippedDelta: 1,
+          activity: {
+            type: "prediction",
+            phase: "skipped",
+            ...context,
+            reason: outcome.reason,
+          },
+        });
       }
     }
 
@@ -169,24 +234,81 @@ async function processDueRetries(deps: PredictionsRunnerDeps): Promise<RunnerRes
   const due = await deps.registry.dueRetries(Date.now());
   for (const item of due) {
     if (deps.isPaused()) return { kind: "paused" };
-    const outcome = await deps.submitPrediction(item.targetAgentId, {
+    const context = {
+      sourceAgentId: item.sourceAgentId,
+      targetAgentId: item.targetAgentId,
       predictionId: item.predictionId,
-      opinionId: item.opinionId,
-      createdAt: "",
+    };
+    await deps.onProgress({
+      activity: { type: "prediction", phase: "submitting", ...context },
     });
+    const outcome = await deps.submitPrediction(
+      item.sourceAgentId,
+      item.targetAgentId,
+      {
+        predictionId: item.predictionId,
+        opinionId: item.opinionId,
+        createdAt: "",
+      },
+    );
     if (outcome.kind === "approved") {
       await deps.registry.complete(item.predictionId);
       await deps.registry.removeRetry(item.predictionId);
-      deps.onProgress({ addedDelta: 1 });
+      await deps.onProgress({
+        addedDelta: 1,
+        activity: {
+          type: "prediction",
+          phase: "confirmed",
+          ...context,
+          txHash: outcome.txHash,
+        },
+      });
+    } else if (outcome.kind === "already_adopted") {
+      await deps.registry.complete(item.predictionId);
+      await deps.registry.removeRetry(item.predictionId);
+      await deps.onProgress({
+        skippedDelta: 1,
+        activity: {
+          type: "prediction",
+          phase: "already_adopted",
+          ...context,
+        },
+      });
     } else if (outcome.kind === "ambiguous") {
       await deps.registry.block(item.predictionId);
+      await deps.onProgress({
+        failedDelta: 1,
+        activity: {
+          type: "prediction",
+          phase: "failed",
+          ...context,
+          reason: outcome.reason,
+        },
+      });
       return { kind: "failed", reason: outcome.reason, global: true };
     } else if (outcome.kind === "rejected" && outcome.retryable) {
       await deps.registry.retry({ ...item, attempts: item.attempts + 1 });
+      await deps.onProgress({
+        failedDelta: 1,
+        activity: {
+          type: "prediction",
+          phase: "failed",
+          ...context,
+          reason: outcome.reason,
+        },
+      });
     } else if (outcome.kind === "rejected") {
       await deps.registry.complete(item.predictionId);
       await deps.registry.removeRetry(item.predictionId);
-      deps.onProgress({ skippedDelta: 1 });
+      await deps.onProgress({
+        skippedDelta: 1,
+        activity: {
+          type: "prediction",
+          phase: "skipped",
+          ...context,
+          reason: outcome.reason,
+        },
+      });
     }
   }
   return { kind: "completed" };

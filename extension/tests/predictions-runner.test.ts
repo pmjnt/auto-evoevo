@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { runPredictions } from "../src/background/predictions-runner.js";
+import {
+  runPredictions,
+  type PredictionProgressUpdate,
+} from "../src/background/predictions-runner.js";
 import { DEFAULT_WORKFLOW_STATE } from "../src/background/storage.js";
 import type {
   AgentPrediction,
@@ -8,6 +11,7 @@ import type {
   SquareAgent,
 } from "../src/background/evoevo-api.js";
 import type { PredictionRegistry } from "../src/background/prediction-registry.js";
+import type { SubmitOutcome } from "../src/background/intake-submitter.js";
 import type { WorkflowState } from "../src/shared/types.js";
 
 const prediction = (predictionId: string, opinionId = Number(predictionId.replace(/\D/g, "")) || 1): AgentPrediction => ({
@@ -71,12 +75,16 @@ function harness(options: { known?: string[]; state?: Partial<WorkflowState> } =
         load: async () => state,
         save: async (next: WorkflowState) => { state = structuredClone(next); },
       },
-      submitPrediction: async (_targetAgentId: number, item: AgentPrediction) => {
+      submitPrediction: async (
+        _sourceAgentId: number,
+        _targetAgentId: number,
+        item: AgentPrediction,
+      ): Promise<SubmitOutcome> => {
         submitted.push(item.predictionId);
         return { kind: "approved" as const, txHash: `0x${item.opinionId}` };
       },
       isPaused: () => false,
-      onProgress: () => undefined,
+      onProgress: async (_update: PredictionProgressUpdate): Promise<void> => undefined,
     },
     get state() { return state; },
     predictionPages,
@@ -109,5 +117,46 @@ describe("Predictions runner", () => {
       reason: "Prediction target is not owned by this wallet",
       global: true,
     });
+  });
+
+  it("logs and continues after an already-adopted prediction", async () => {
+    const setup = harness();
+    setup.predictionPages.set(3314, [
+      page([prediction("already", 1), prediction("fresh", 2)], null),
+    ]);
+    const updates: PredictionProgressUpdate[] = [];
+    setup.deps.onProgress = vi.fn(async (update) => { updates.push(update); });
+    setup.deps.submitPrediction = vi.fn(async (
+      _sourceAgentId: number,
+      _targetAgentId: number,
+      item: AgentPrediction,
+    ) => item.predictionId === "already"
+      ? { kind: "already_adopted" as const }
+      : { kind: "approved" as const, txHash: "0xfresh" });
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.deps.submitPrediction).toHaveBeenCalledTimes(2);
+    expect(await setup.deps.registry.has("already")).toBe(true);
+    expect(updates).toContainEqual(expect.objectContaining({
+      skippedDelta: 1,
+      activity: {
+        type: "prediction",
+        phase: "already_adopted",
+        sourceAgentId: 3314,
+        targetAgentId: 900,
+        predictionId: "already",
+      },
+    }));
+    expect(updates).toContainEqual(expect.objectContaining({
+      addedDelta: 1,
+      activity: expect.objectContaining({
+        type: "prediction",
+        phase: "confirmed",
+        txHash: "0xfresh",
+      }),
+    }));
   });
 });

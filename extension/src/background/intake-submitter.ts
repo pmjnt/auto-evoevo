@@ -40,6 +40,7 @@ export type IntakeSubmitterDeps = {
 
 export type SubmitOutcome =
   | { kind: "approved"; txHash: string }
+  | { kind: "already_adopted" }
   | { kind: "dry_run" }
   | { kind: "ambiguous"; txHash: string; reason: string }
   | { kind: "rejected"; reason: string; retryable: boolean };
