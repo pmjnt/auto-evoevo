@@ -100,7 +100,6 @@ export async function runFeedForAgent(
     return { kind: "failed", reason: `SIWE failed: ${errorMessage(error)}`, global: true };
   }
 
-  const cooldownMs = Math.max(0, deps.config.cooldownSeconds) * 1000;
   const stopAtRemaining = Math.max(0, deps.config.stopAtRemaining);
 
   for (const tab of FEED_TABS) {
@@ -181,17 +180,14 @@ export async function runFeedForAgent(
 
       if (outcome.kind === "approved") {
         deps.onEvent({ type: "approved", txHash: outcome.txHash });
-        if (cooldownMs > 0) await sleep(cooldownMs);
         continue;
       }
 
       if (outcome.kind === "dry_run") {
-        if (cooldownMs > 0) await sleep(cooldownMs);
         continue;
       }
 
       if (outcome.kind === "already_adopted") {
-        if (cooldownMs > 0) await sleep(cooldownMs);
         continue;
       }
 

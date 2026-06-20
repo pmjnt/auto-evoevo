@@ -87,6 +87,34 @@ describe("intake submitter", () => {
     expect(setup.entries.at(-1)?.status).toBe("signed");
   });
 
+  it("waits the configured cooldown after a successful receipt", async () => {
+    const setup = deps();
+    const events: string[] = [];
+    const sleep = vi.fn(async (ms: number) => {
+      events.push(`sleep:${ms}`);
+    });
+    setup.value.rpc.waitForReceipt = vi.fn(async () => {
+      events.push("receipt");
+      return { status: "success", receipt: {} };
+    });
+    setup.value.log.append = async (entry: AttemptLog) => {
+      events.push(`log:${entry.status}`);
+      setup.entries.push(entry);
+    };
+
+    await expect(submitIntake(payload, {
+      ...setup.value,
+      config: { ...config, cooldownSeconds: 2 },
+      sleep,
+    })).resolves.toEqual({
+      kind: "approved",
+      txHash: "0xtx",
+    });
+
+    expect(sleep).toHaveBeenCalledWith(2_000);
+    expect(events).toEqual(["receipt", "log:signed", "sleep:2000"]);
+  });
+
   it("returns ambiguous with the hash on receipt timeout", async () => {
     const setup = deps("timeout");
     await expect(submitIntake(payload, setup.value)).resolves.toEqual({

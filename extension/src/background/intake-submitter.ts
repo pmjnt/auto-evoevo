@@ -36,6 +36,7 @@ export type IntakeSubmitterDeps = {
   >;
   log: { append: (entry: AttemptLog) => Promise<void> };
   random?: () => number;
+  sleep?: (ms: number) => Promise<void>;
 };
 
 export type SubmitOutcome =
@@ -227,6 +228,10 @@ export async function submitIntake(
       txHash: broadcastTxHash,
     }),
   );
+  const cooldownMs = Math.max(0, config.cooldownSeconds) * 1000;
+  if (cooldownMs > 0) {
+    await (deps.sleep ?? sleep)(cooldownMs);
+  }
   return { kind: "approved", txHash: broadcastTxHash };
 }
 
@@ -248,4 +253,8 @@ export function makeAttemptLog(
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
