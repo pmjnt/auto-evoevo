@@ -99,6 +99,9 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
     if (wallet.address === null) {
       return { kind: "failed", reason: "Wallet locked", global: true };
     }
+    await evoEvoApi.ensureAuth(wallet.address, (message) =>
+      wallet.signMessage(message),
+    );
     const rpc = new RpcClient(config.rpcUrl);
     return await runPredictions({
       api: evoEvoApi,
@@ -268,7 +271,7 @@ async function startMode(mode: "feed" | "predictions" | "both"): Promise<RouterR
   if (!ready || wallet.address === null) {
     return {
       ok: false,
-      error: { code: 4100, message: "Wallet has no private key — import one in Settings" },
+      error: { code: 4100, message: "Wallet has no private key. Import one in Settings." },
     };
   }
   paused = false;

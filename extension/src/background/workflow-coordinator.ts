@@ -81,9 +81,13 @@ export class WorkflowCoordinator {
 
   private launchCycle(): void {
     if (this.running !== null) return;
-    this.running = this.runCycle().finally(() => {
-      this.running = null;
-    });
+    this.running = this.runCycle()
+      .catch(async (error: unknown) => {
+        await this.pauseWithError(errorMessage(error));
+      })
+      .finally(() => {
+        this.running = null;
+      });
   }
 
   private async runCycle(): Promise<void> {
@@ -152,6 +156,10 @@ export class WorkflowCoordinator {
     await this.deps.setState(state);
     await chrome.alarms.clear(WORKFLOW_ALARM_NAME);
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function fullScanDue(

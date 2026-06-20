@@ -63,6 +63,24 @@ describe("WorkflowCoordinator", () => {
     expect(setup.calls).toEqual([]);
   });
 
+  it("pauses with the thrown runner error instead of rejecting the cycle", async () => {
+    const setup = coordinator({
+      runFeed: async () => {
+        throw new Error("SIWE unavailable");
+      },
+    });
+
+    await setup.value.start("feed");
+    await expect(setup.value.idle()).resolves.toBeUndefined();
+
+    expect(await getWorkflowState()).toMatchObject({
+      status: "paused",
+      activeWorkflow: null,
+      nextRunAt: null,
+      lastError: "SIWE unavailable",
+    });
+  });
+
   it("pause clears the next alarm and persists paused", async () => {
     const setup = coordinator();
     await setup.value.start("feed");
