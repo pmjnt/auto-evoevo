@@ -25,6 +25,13 @@ describe("messages schema", () => {
     expect(parsed.type).toBe("get-config");
   });
 
+  it.each(["run-feed", "run-predictions", "run-both"] as const)(
+    "parses %s",
+    (type) => {
+      expect(parseMessage({ type }).type).toBe(type);
+    },
+  );
+
   it("rejects an unknown type", () => {
     expect(() => parseMessage({ type: "bogus" })).toThrow();
   });

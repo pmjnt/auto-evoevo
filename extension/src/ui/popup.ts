@@ -14,6 +14,8 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   cooldownSeconds: 1,
   stopAtRemaining: 10,
   agentId: 0,
+  repeatIntervalMinutes: 120,
+  reconciliationIntervalMinutes: 1440,
 };
 
 type Status = {
@@ -235,6 +237,8 @@ function currentConfig() {
     cooldownSeconds: Math.max(0, Math.min(300, Number(elValue("cooldownSeconds")) || 0)),
     stopAtRemaining: Math.max(0, Math.min(1000, Number(elValue("stopAtRemaining")) || 0)),
     agentId: Math.max(0, Number(elValue("agentId")) || 0),
+    repeatIntervalMinutes: DEFAULT_CONFIG.repeatIntervalMinutes,
+    reconciliationIntervalMinutes: DEFAULT_CONFIG.reconciliationIntervalMinutes,
   };
 }
 

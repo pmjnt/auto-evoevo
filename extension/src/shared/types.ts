@@ -34,6 +34,52 @@ export type ExtensionConfig = {
   // Agent id whose feed we automate. All submissions go through this
   // agent. 0 = unset, automation refuses to start.
   agentId: number;
+  repeatIntervalMinutes: number;
+  reconciliationIntervalMinutes: number;
+};
+
+export type WorkflowMode = "feed" | "predictions" | "both";
+export type WorkflowName = "feed" | "predictions";
+export type WorkflowStatus = "idle" | "running" | "paused" | "error";
+export type FeedTabName = "recommended" | "weekly" | "monthly" | "all_time";
+
+export type WorkflowCounters = {
+  ownedAgents: number;
+  feedAgentsCompleted: number;
+  sourceAgents: number;
+  predictionsScanned: number;
+  added: number;
+  skipped: number;
+  failed: number;
+  registryBytes: number;
+};
+
+export type RetryItem = {
+  predictionId: string;
+  opinionId: number;
+  sourceAgentId: number;
+  targetAgentId: number;
+  attempts: number;
+  retryAfter: number;
+};
+
+export type WorkflowState = {
+  version: 1;
+  mode: WorkflowMode | null;
+  status: WorkflowStatus;
+  activeWorkflow: WorkflowName | null;
+  nextRunAt: number | null;
+  lastIncrementalAt: number | null;
+  lastReconciliationAt: number | null;
+  feedAgentIndex: number;
+  feedTab: FeedTabName | null;
+  squareOffset: number;
+  sourceAgentIds: number[];
+  predictionOffsets: Record<string, number>;
+  retryQueue: RetryItem[];
+  blockedPredictionIds: string[];
+  counters: WorkflowCounters;
+  lastError: string | null;
 };
 
 export type AttemptStatus =

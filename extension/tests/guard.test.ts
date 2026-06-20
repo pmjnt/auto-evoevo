@@ -15,6 +15,8 @@ const baseConfig: ExtensionConfig = {
   cooldownSeconds: 0,
   stopAtRemaining: 0,
   agentId: 0,
+  repeatIntervalMinutes: 120,
+  reconciliationIntervalMinutes: 1440,
 };
 
 const baseRequest: WalletRequest = {
