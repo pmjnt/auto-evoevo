@@ -113,7 +113,7 @@ function harness(options: {
 
 describe("Predictions runner", () => {
   it("full scan finds an unknown ID after a known ID", async () => {
-    const setup = harness({ known: ["known-middle"] });
+    const setup = harness({ known: ["202"] });
 
     await runPredictions(setup.deps, { scan: "full", targetAgentId: 900 });
 
@@ -177,6 +177,23 @@ describe("Predictions runner", () => {
     expect(setup.requestedSources).toEqual([60062]);
     expect(setup.submitted).toEqual(["fresh-60062"]);
     expect(setup.state.completedPredictionSourceIds).toEqual([3314, 60062]);
+  });
+
+  it("deduplicates predictions by opinion id, not shared market prediction id", async () => {
+    const setup = harness({
+      state: {
+        sourceAgentIds: [3314, 60062],
+        predictionScanStartedAt: 10_000,
+      },
+    });
+    setup.predictionPages.set(3314, [page([prediction("shared-market", 101)], null)]);
+    setup.predictionPages.set(60062, [page([prediction("shared-market", 202)], null)]);
+
+    await expect(
+      runPredictions(setup.deps, { scan: "incremental", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.submitted).toEqual(["shared-market", "shared-market"]);
   });
 
   it("starts a new prediction source scan window after 24 hours from scan start", async () => {
@@ -267,7 +284,7 @@ describe("Predictions runner", () => {
     ).resolves.toEqual({ kind: "completed" });
 
     expect(setup.deps.submitPrediction).toHaveBeenCalledTimes(2);
-    expect(await setup.deps.registry.has("already")).toBe(true);
+    expect(await setup.deps.registry.has("1")).toBe(true);
     expect(updates).toContainEqual(expect.objectContaining({
       skippedDelta: 1,
       activity: {
@@ -335,7 +352,7 @@ describe("Predictions runner", () => {
 
     expect(setup.deps.submitPrediction).toHaveBeenCalledTimes(1);
     expect(setup.submitted).toEqual(["fresh"]);
-    expect(await setup.deps.registry.has("already-viewed")).toBe(true);
+    expect(await setup.deps.registry.has("1")).toBe(true);
     expect(updates).toContainEqual(expect.objectContaining({
       skippedDelta: 1,
       activity: {

@@ -159,14 +159,15 @@ async function processSource(
     for (const prediction of page.items) {
       if (deps.isPaused()) return { kind: "paused" };
       await deps.onProgress({ scannedDelta: 1 });
-      if (await deps.registry.has(prediction.predictionId)) continue;
+      const registryId = predictionRegistryId(prediction);
+      if (await deps.registry.has(registryId)) continue;
       const context = {
         sourceAgentId: args.sourceAgentId,
         targetAgentId: args.targetAgentId,
         predictionId: prediction.predictionId,
       };
       if (prediction.viewerHasIntaken) {
-        await deps.registry.complete(prediction.predictionId);
+        await deps.registry.complete(registryId);
         await deps.onProgress({
           skippedDelta: 1,
           activity: {
@@ -189,7 +190,7 @@ async function processSource(
         prediction,
       );
       if (outcome.kind === "approved") {
-        completed.push(prediction.predictionId);
+        completed.push(registryId);
         await deps.onProgress({
           addedDelta: 1,
           activity: {
@@ -200,7 +201,7 @@ async function processSource(
           },
         });
       } else if (outcome.kind === "already_adopted") {
-        await deps.registry.complete(prediction.predictionId);
+        await deps.registry.complete(registryId);
         await deps.onProgress({
           skippedDelta: 1,
           activity: {
@@ -214,7 +215,7 @@ async function processSource(
       } else if (outcome.kind === "dry_run") {
         continue;
       } else if (outcome.kind === "ambiguous") {
-        await deps.registry.block(prediction.predictionId);
+        await deps.registry.block(registryId);
         await deps.onProgress({
           failedDelta: 1,
           activity: {
@@ -227,7 +228,7 @@ async function processSource(
         return { kind: "failed", reason: outcome.reason, global: true };
       } else if (outcome.retryable) {
         await deps.registry.retry({
-          predictionId: prediction.predictionId,
+          predictionId: registryId,
           opinionId: prediction.opinionId,
           sourceAgentId: args.sourceAgentId,
           targetAgentId: args.targetAgentId,
@@ -244,7 +245,7 @@ async function processSource(
           },
         });
       } else {
-        completed.push(prediction.predictionId);
+        completed.push(registryId);
         await deps.onProgress({
           skippedDelta: 1,
           activity: {
@@ -409,4 +410,8 @@ function assertFreshPage<T>(
 
 function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values)].sort((a, b) => a - b);
+}
+
+function predictionRegistryId(prediction: AgentPrediction): string {
+  return String(prediction.opinionId);
 }
