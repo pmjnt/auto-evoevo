@@ -58,7 +58,7 @@ describe("messages schema", () => {
       config: validConfig,
     });
 
-    expect(parsed.type).toBe("set-config");
+    if (parsed.type !== "set-config") throw new Error("Expected set-config");
     expect(parsed.config.predictionReadCooldownSeconds).toBe(2);
   });
 
@@ -71,7 +71,7 @@ describe("messages schema", () => {
       },
     });
 
-    expect(parsed.type).toBe("set-config");
+    if (parsed.type !== "set-config") throw new Error("Expected set-config");
     expect(parsed.config.predictionReadCooldownSeconds).toBe(2);
   });
 
