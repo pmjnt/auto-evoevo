@@ -8,6 +8,9 @@ export function formatWorkflowEvent(event: Record<string, unknown>): string | nu
   if (event.type === "predictions-rate-limited") {
     const typed = event as PredictionActivityEvent & { type: "predictions-rate-limited" };
     const minutes = Math.max(1, Math.ceil(typed.retryAfterMs / 60_000));
+    if (typed.sourceAgentId !== undefined) {
+      return `[Predictions] Source ${typed.sourceAgentId} rate limited. Retrying in ${minutes} minutes.`;
+    }
     return `[Predictions] Rate limited. Retrying in ${minutes} minutes.`;
   }
   if (event.type === "prediction") {

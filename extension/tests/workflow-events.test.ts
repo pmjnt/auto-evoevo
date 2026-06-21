@@ -32,5 +32,10 @@ describe("formatWorkflowEvent", () => {
       type: "predictions-rate-limited",
       retryAfterMs: 900_000,
     })).toBe("[Predictions] Rate limited. Retrying in 15 minutes.");
+    expect(formatWorkflowEvent({
+      type: "predictions-rate-limited",
+      retryAfterMs: 900_000,
+      sourceAgentId: 6714,
+    })).toBe("[Predictions] Source 6714 rate limited. Retrying in 15 minutes.");
   });
 });

@@ -5,6 +5,7 @@ import { preparePredictionIntake } from "../src/background/prediction-submitter.
 
 const config = {
   memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
   rateLimitBackoffMinutes: 15,
 };
 

@@ -18,6 +18,7 @@ const config: ExtensionConfig = {
   dryRun: false,
   cooldownSeconds: 0,
   memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
   rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 1,
