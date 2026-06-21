@@ -216,4 +216,101 @@ describe("WorkflowCoordinator", () => {
 
     expect(calls).toEqual(["feed:start", "feed:paused=true", "predictions:full"]);
   });
+
+  it("starts only the latest pending mode after repeated quick switches", async () => {
+    const gate = deferred();
+    const calls: string[] = [];
+    let setup!: ReturnType<typeof coordinator>;
+    setup = coordinator({
+      runPredictions: async (_targetAgentId, scan) => {
+        calls.push(`predictions:${scan}:start`);
+        if (calls.length === 1) {
+          await gate.promise;
+          calls.push(`predictions:${scan}:paused=${setup.value.isPaused()}`);
+          return setup.value.isPaused() ? { kind: "paused" } : { kind: "completed" };
+        }
+        return { kind: "completed" };
+      },
+      runFeed: async () => {
+        calls.push("feed");
+        return { kind: "completed" };
+      },
+    });
+
+    await setup.value.start("predictions");
+    await vi.waitFor(() => expect(calls).toEqual(["predictions:full:start"]));
+
+    await setup.value.start("feed");
+    await setup.value.start("both");
+
+    gate.resolve();
+    await setup.value.idle();
+
+    expect(calls).toEqual([
+      "predictions:full:start",
+      "predictions:full:paused=true",
+      "feed",
+      "predictions:full:start",
+    ]);
+  });
+
+  it("does not start pending mode when the user pauses after switching", async () => {
+    const gate = deferred();
+    const calls: string[] = [];
+    let setup!: ReturnType<typeof coordinator>;
+    setup = coordinator({
+      runPredictions: async () => {
+        calls.push("predictions:start");
+        await gate.promise;
+        calls.push(`predictions:paused=${setup.value.isPaused()}`);
+        return setup.value.isPaused() ? { kind: "paused" } : { kind: "completed" };
+      },
+      runFeed: async () => {
+        calls.push("feed");
+        return { kind: "completed" };
+      },
+    });
+
+    await setup.value.start("predictions");
+    await vi.waitFor(() => expect(calls).toEqual(["predictions:start"]));
+
+    await setup.value.start("feed");
+    await setup.value.pause();
+    gate.resolve();
+    await setup.value.idle();
+
+    expect(calls).toEqual(["predictions:start", "predictions:paused=true"]);
+    expect((await getWorkflowState()).status).toBe("paused");
+  });
+
+  it("keeps global runner failures from starting a pending mode", async () => {
+    const gate = deferred();
+    const calls: string[] = [];
+    const setup = coordinator({
+      runPredictions: async () => {
+        calls.push("predictions:start");
+        await gate.promise;
+        calls.push("predictions:failed");
+        return { kind: "failed", reason: "backend rejected tx", global: true };
+      },
+      runFeed: async () => {
+        calls.push("feed");
+        return { kind: "completed" };
+      },
+    });
+
+    await setup.value.start("predictions");
+    await vi.waitFor(() => expect(calls).toEqual(["predictions:start"]));
+
+    await setup.value.start("feed");
+    gate.resolve();
+    await setup.value.idle();
+
+    expect(calls).toEqual(["predictions:start", "predictions:failed"]);
+    expect(await getWorkflowState()).toMatchObject({
+      status: "paused",
+      mode: "feed",
+      lastError: "backend rejected tx",
+    });
+  });
 });
