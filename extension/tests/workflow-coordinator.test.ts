@@ -38,6 +38,14 @@ function coordinator(overrides: Partial<ConstructorParameters<typeof WorkflowCoo
   return { value, calls };
 }
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
+}
+
 describe("WorkflowCoordinator", () => {
   beforeEach(() => {
     installFakeChromeApi();
@@ -146,5 +154,64 @@ describe("WorkflowCoordinator", () => {
     await setup.value.idle();
 
     expect(setup.calls).toEqual([]);
+  });
+
+  it("interrupts active Predictions and starts Feed when Run Feed is clicked", async () => {
+    const gate = deferred();
+    const calls: string[] = [];
+    let setup!: ReturnType<typeof coordinator>;
+    setup = coordinator({
+      runPredictions: async () => {
+        calls.push("predictions:start");
+        await gate.promise;
+        calls.push(`predictions:paused=${setup.value.isPaused()}`);
+        return setup.value.isPaused() ? { kind: "paused" } : { kind: "completed" };
+      },
+      runFeed: async () => {
+        calls.push("feed");
+        return { kind: "completed" };
+      },
+    });
+
+    await setup.value.start("predictions");
+    await vi.waitFor(() => expect(calls).toEqual(["predictions:start"]));
+
+    await setup.value.start("feed");
+    expect(setup.value.isPaused()).toBe(true);
+
+    gate.resolve();
+    await setup.value.idle();
+
+    expect(calls).toEqual(["predictions:start", "predictions:paused=true", "feed"]);
+    expect(chrome.alarms.create).toHaveBeenCalledWith("workflow-cycle", { when: 7_201_000 });
+  });
+
+  it("interrupts active Feed and starts Predictions when Run Predictions is clicked", async () => {
+    const gate = deferred();
+    const calls: string[] = [];
+    let setup!: ReturnType<typeof coordinator>;
+    setup = coordinator({
+      runFeed: async () => {
+        calls.push("feed:start");
+        await gate.promise;
+        calls.push(`feed:paused=${setup.value.isPaused()}`);
+        return setup.value.isPaused() ? { kind: "paused" } : { kind: "completed" };
+      },
+      runPredictions: async (_targetAgentId, scan) => {
+        calls.push(`predictions:${scan}`);
+        return { kind: "completed" };
+      },
+    });
+
+    await setup.value.start("feed");
+    await vi.waitFor(() => expect(calls).toEqual(["feed:start"]));
+
+    await setup.value.start("predictions");
+    expect(setup.value.isPaused()).toBe(true);
+
+    gate.resolve();
+    await setup.value.idle();
+
+    expect(calls).toEqual(["feed:start", "feed:paused=true", "predictions:full"]);
   });
 });
