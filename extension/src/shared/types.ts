@@ -28,6 +28,7 @@ export type ExtensionConfig = {
   dryRun: boolean;
   cooldownSeconds: number;
   memoryApiCooldownSeconds: number;
+  predictionReadCooldownSeconds: number;
   rateLimitBackoffMinutes: number;
   // Stop automation when each feed tab has fewer than this many
   // unprocessed opinions left. Lets the user leave a buffer rather than
@@ -48,7 +49,7 @@ export type FeedTabName = "recommended" | "weekly" | "monthly" | "all_time";
 export type PredictionActivityEvent =
   | { type: "predictions-loading" }
   | { type: "predictions-sources"; count: number }
-  | { type: "predictions-rate-limited"; retryAfterMs: number }
+  | { type: "predictions-rate-limited"; retryAfterMs: number; sourceAgentId?: number }
   | {
       type: "prediction";
       phase: "submitting" | "confirmed" | "already_adopted" | "skipped" | "failed";
@@ -91,6 +92,8 @@ export type WorkflowState = {
   feedTab: FeedTabName | null;
   squareOffset: number;
   sourceAgentIds: number[];
+  completedPredictionSourceIds: number[];
+  predictionScanStartedAt: number | null;
   predictionOffsets: Record<string, number>;
   retryQueue: RetryItem[];
   blockedPredictionIds: string[];

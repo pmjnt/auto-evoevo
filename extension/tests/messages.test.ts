@@ -1,6 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { parseMessage } from "../src/shared/messages.js";
 
+const validConfig = {
+  allowedOrigin: "https://evoevo.ai",
+  allowedChain: "0G",
+  chainId: 16661,
+  rpcUrl: "https://rpc.example",
+  allowedContracts: ["0x" + "ab".repeat(20)],
+  allowedFunctionSelectors: ["0xa29adb25"],
+  maxFeeNative: 0.01,
+  gasPriceJitterPercent: 10,
+  dryRun: true,
+  cooldownSeconds: 0,
+  memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
+  rateLimitBackoffMinutes: 15,
+  stopAtRemaining: 0,
+  agentId: 900,
+  repeatIntervalMinutes: 120,
+  reconciliationIntervalMinutes: 1440,
+};
+
 describe("messages schema", () => {
   it("parses a valid rpc-request", () => {
     const parsed = parseMessage({
@@ -31,6 +51,29 @@ describe("messages schema", () => {
       expect(parseMessage({ type }).type).toBe(type);
     },
   );
+
+  it("parses prediction read cooldown in set-config", () => {
+    const parsed = parseMessage({
+      type: "set-config",
+      config: validConfig,
+    });
+
+    expect(parsed.type).toBe("set-config");
+    expect(parsed.config.predictionReadCooldownSeconds).toBe(2);
+  });
+
+  it("defaults prediction read cooldown in set-config", () => {
+    const parsed = parseMessage({
+      type: "set-config",
+      config: {
+        ...validConfig,
+        predictionReadCooldownSeconds: undefined,
+      },
+    });
+
+    expect(parsed.type).toBe("set-config");
+    expect(parsed.config.predictionReadCooldownSeconds).toBe(2);
+  });
 
   it("rejects an unknown type", () => {
     expect(() => parseMessage({ type: "bogus" })).toThrow();

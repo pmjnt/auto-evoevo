@@ -28,6 +28,7 @@ const config = {
   dryRun: true,
   cooldownSeconds: 0,
   memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
   rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 0,
@@ -113,8 +114,10 @@ describe("popup workflow console", () => {
   it("exposes predictions rate limit controls", () => {
     const popupSource = readFileSync(resolve("src/ui/popup.ts"), "utf8");
     expect(popupHtml).toContain('id="memoryApiCooldownSeconds"');
+    expect(popupHtml).toContain('id="predictionReadCooldownSeconds"');
     expect(popupHtml).toContain('id="rateLimitBackoffMinutes"');
     expect(popupSource).toContain("memoryApiCooldownSeconds: clampInt");
+    expect(popupSource).toContain("predictionReadCooldownSeconds: clampInt");
     expect(popupSource).toContain("rateLimitBackoffMinutes: clampInt");
   });
 });

@@ -56,6 +56,7 @@ export const setConfigSchema = z.object({
     dryRun: z.boolean(),
     cooldownSeconds: z.number().int().min(0).max(300).default(0),
     memoryApiCooldownSeconds: z.number().int().min(0).max(60).default(1),
+    predictionReadCooldownSeconds: z.number().int().min(0).max(60).default(2),
     rateLimitBackoffMinutes: z.number().int().min(1).max(1440).default(15),
     stopAtRemaining: z.number().int().min(0).max(1000).default(10),
     agentId: z.number().int().min(0).default(0),
