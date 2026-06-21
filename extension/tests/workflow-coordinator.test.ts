@@ -313,4 +313,50 @@ describe("WorkflowCoordinator", () => {
       lastError: "backend rejected tx",
     });
   });
+
+  it("does not let a delayed Feed cycle clear a pending Predictions switch", async () => {
+    const releaseOldStateRead = deferred();
+    const oldStateReadStarted = deferred();
+    const calls: string[] = [];
+    let state = structuredClone(DEFAULT_WORKFLOW_STATE);
+    let stateReadCount = 0;
+    let delayedState = "";
+    let value!: WorkflowCoordinator;
+    value = new WorkflowCoordinator({
+      getConfig: async () => config,
+      getState: async () => {
+        stateReadCount += 1;
+        const snapshot = structuredClone(state);
+        if (stateReadCount === 2) {
+          delayedState = `${snapshot.status}:${snapshot.mode}`;
+          oldStateReadStarted.resolve();
+          await releaseOldStateRead.promise;
+        }
+        return snapshot;
+      },
+      setState: async (nextState) => {
+        state = structuredClone(nextState);
+      },
+      runFeed: async () => {
+        calls.push(`feed:paused=${value.isPaused()}`);
+        return value.isPaused() ? { kind: "paused" } : { kind: "completed" };
+      },
+      runPredictions: async () => {
+        calls.push("predictions");
+        return { kind: "completed" };
+      },
+      now: () => 1_000,
+    });
+
+    await value.start("feed");
+    await oldStateReadStarted.promise;
+    expect(delayedState).toBe("running:feed");
+
+    await value.start("predictions");
+    releaseOldStateRead.resolve();
+    await value.idle();
+
+    expect(calls).toEqual(["predictions"]);
+    expect(state.mode).toBe("predictions");
+  });
 });

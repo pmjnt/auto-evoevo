@@ -138,7 +138,7 @@ export class WorkflowCoordinator {
     }
     let state = await this.deps.getState();
     if (state.status !== "running" || state.mode === null) return;
-    this.pauseRequested = false;
+    if (this.pauseRequested) return;
 
     if (state.mode === "feed" || state.mode === "both") {
       state.activeWorkflow = "feed";
