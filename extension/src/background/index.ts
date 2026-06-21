@@ -113,6 +113,7 @@ const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
       api: evoEvoApi,
       walletAddress: wallet.address,
       chainId: config.chainId,
+      config,
       registry,
       checkpoint: { load: getWorkflowState, save: setWorkflowState },
       isPaused: () => coordinator.isPaused(),

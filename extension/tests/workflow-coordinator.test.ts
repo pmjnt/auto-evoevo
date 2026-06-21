@@ -16,6 +16,7 @@ const config: ExtensionConfig = {
   dryRun: true,
   cooldownSeconds: 0,
   memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
   rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 900,
@@ -111,6 +112,30 @@ describe("WorkflowCoordinator", () => {
     expect(await chrome.alarms.get(WORKFLOW_ALARM_NAME)).toMatchObject({
       scheduledTime: 1_900_000,
     });
+  });
+
+  it("uses prediction scan start as the full scan interval anchor", async () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const calls: string[] = [];
+    await setWorkflowState({
+      ...structuredClone(DEFAULT_WORKFLOW_STATE),
+      status: "running",
+      mode: "predictions",
+      predictionScanStartedAt: 10_000,
+      lastReconciliationAt: 20_000,
+    });
+    const setup = coordinator({
+      now: () => 10_000 + dayMs,
+      runPredictions: async (_target, scan) => {
+        calls.push(`predictions:${scan}`);
+        return { kind: "completed" };
+      },
+    });
+
+    await setup.value.recover();
+    await setup.value.idle();
+
+    expect(calls).toEqual(["predictions:full"]);
   });
 
   it("recover does not resume a user-paused workflow", async () => {

@@ -5,15 +5,18 @@ import type {
   PageRequest,
   SquareAgent,
 } from "./evoevo-api.js";
+import { EvoEvoHttpError } from "./evoevo-api.js";
 import type { SubmitOutcome } from "./intake-submitter.js";
 import type { PredictionRegistry } from "./prediction-registry.js";
 import type { RunnerResult } from "./direct-runner.js";
 import type {
   PredictionActivityEvent,
+  ExtensionConfig,
   WorkflowState,
 } from "../shared/types.js";
 
 export type PredictionScan = "incremental" | "full";
+const PREDICTION_SCAN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export type PredictionProgressUpdate = {
   sourceAgents?: number;
@@ -31,6 +34,7 @@ export type PredictionsRunnerDeps = {
   >;
   walletAddress: string;
   chainId: number;
+  config: Pick<ExtensionConfig, "predictionReadCooldownSeconds" | "rateLimitBackoffMinutes">;
   registry: PredictionRegistry;
   checkpoint: {
     load: () => Promise<WorkflowState>;
@@ -43,6 +47,8 @@ export type PredictionsRunnerDeps = {
   ) => Promise<SubmitOutcome>;
   isPaused: () => boolean;
   onProgress: (update: PredictionProgressUpdate) => Promise<void>;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
 };
 
 export async function runPredictions(
@@ -61,16 +67,20 @@ export async function runPredictions(
   const retryResult = await processDueRetries(deps);
   if (retryResult.kind !== "completed") return retryResult;
 
+  await preparePredictionScanWindow(deps);
   await deps.onProgress({ activity: { type: "predictions-loading" } });
   const sourceAgentIds = args.scan === "full"
     ? await collectAllSourceAgents(deps)
     : await collectIncrementalSourceAgents(deps);
+  const checkpoint = await deps.checkpoint.load();
+  const completedSourceIds = new Set(checkpoint.completedPredictionSourceIds);
+  const pendingSourceAgentIds = sourceAgentIds.filter((id) => !completedSourceIds.has(id));
   await deps.onProgress({
     sourceAgents: sourceAgentIds.length,
     activity: { type: "predictions-sources", count: sourceAgentIds.length },
   });
 
-  for (const sourceAgentId of sourceAgentIds) {
+  for (const sourceAgentId of pendingSourceAgentIds) {
     if (deps.isPaused()) return { kind: "paused" };
     const result = await processSource(deps, {
       sourceAgentId,
@@ -78,6 +88,7 @@ export async function runPredictions(
       full: args.scan === "full",
     });
     if (result.kind !== "completed") return result;
+    await markSourceComplete(deps, sourceAgentId);
   }
 
   return { kind: "completed" };
@@ -123,12 +134,24 @@ async function processSource(
   let before: number | undefined;
   const seenFingerprints = new Set<string>();
   while (true) {
-    const page = await deps.api.listAgentPredictions({
-      sourceAgentId: args.sourceAgentId,
-      chainId: deps.chainId,
-      limit: 20,
-      before,
-    });
+    const delayMs = Math.max(0, deps.config.predictionReadCooldownSeconds) * 1000;
+    if (delayMs > 0) await (deps.sleep ?? sleep)(delayMs);
+
+    let page: ApiPage<AgentPrediction>;
+    try {
+      page = await deps.api.listAgentPredictions({
+        sourceAgentId: args.sourceAgentId,
+        chainId: deps.chainId,
+        limit: 20,
+        before,
+      });
+    } catch (error) {
+      if (error instanceof EvoEvoHttpError && error.status === 429) {
+        const retryAfterMs = Math.max(1, deps.config.rateLimitBackoffMinutes) * 60_000;
+        return await reportRateLimit(deps, retryAfterMs, args.sourceAgentId);
+      }
+      throw error;
+    }
     assertFreshPage(seenFingerprints, page, `predictions:${args.sourceAgentId}`);
     let sawUnknown = false;
     const completed: string[] = [];
@@ -187,7 +210,7 @@ async function processSource(
           },
         });
       } else if (outcome.kind === "rate_limited") {
-        return await reportRateLimit(deps, outcome.retryAfterMs);
+        return await reportRateLimit(deps, outcome.retryAfterMs, args.sourceAgentId);
       } else if (outcome.kind === "dry_run") {
         continue;
       } else if (outcome.kind === "ambiguous") {
@@ -292,7 +315,7 @@ async function processDueRetries(deps: PredictionsRunnerDeps): Promise<RunnerRes
         },
       });
     } else if (outcome.kind === "rate_limited") {
-      return await reportRateLimit(deps, outcome.retryAfterMs);
+      return await reportRateLimit(deps, outcome.retryAfterMs, item.sourceAgentId);
     } else if (outcome.kind === "ambiguous") {
       await deps.registry.block(item.predictionId);
       await deps.onProgress({
@@ -336,11 +359,41 @@ async function processDueRetries(deps: PredictionsRunnerDeps): Promise<RunnerRes
 async function reportRateLimit(
   deps: PredictionsRunnerDeps,
   retryAfterMs: number,
+  sourceAgentId?: number,
 ): Promise<RunnerResult> {
   await deps.onProgress({
-    activity: { type: "predictions-rate-limited", retryAfterMs },
+    activity: { type: "predictions-rate-limited", retryAfterMs, sourceAgentId },
   });
   return { kind: "rate_limited", retryAfterMs };
+}
+
+async function preparePredictionScanWindow(deps: PredictionsRunnerDeps): Promise<void> {
+  const now = (deps.now ?? Date.now)();
+  const state = await deps.checkpoint.load();
+  if (
+    state.predictionScanStartedAt === null ||
+    now - state.predictionScanStartedAt >= PREDICTION_SCAN_WINDOW_MS
+  ) {
+    state.predictionScanStartedAt = now;
+    state.completedPredictionSourceIds = [];
+    await deps.checkpoint.save(state);
+  }
+}
+
+async function markSourceComplete(
+  deps: PredictionsRunnerDeps,
+  sourceAgentId: number,
+): Promise<void> {
+  const state = await deps.checkpoint.load();
+  state.completedPredictionSourceIds = uniqueNumbers([
+    ...state.completedPredictionSourceIds,
+    sourceAgentId,
+  ]);
+  await deps.checkpoint.save(state);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function assertFreshPage<T>(

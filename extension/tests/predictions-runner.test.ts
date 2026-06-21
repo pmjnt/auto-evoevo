@@ -10,6 +10,7 @@ import type {
   PageRequest,
   SquareAgent,
 } from "../src/background/evoevo-api.js";
+import { EvoEvoHttpError } from "../src/background/evoevo-api.js";
 import type { PredictionRegistry } from "../src/background/prediction-registry.js";
 import type { SubmitOutcome } from "../src/background/intake-submitter.js";
 import type { WorkflowState } from "../src/shared/types.js";
@@ -48,7 +49,14 @@ function registry(seed: string[] = []): PredictionRegistry {
   };
 }
 
-function harness(options: { known?: string[]; state?: Partial<WorkflowState> } = {}) {
+function harness(options: {
+  known?: string[];
+  state?: Partial<WorkflowState>;
+  now?: number;
+  predictionReadCooldownSeconds?: number;
+} = {}) {
+  const sleep = vi.fn(async (_ms: number) => undefined);
+  const now = vi.fn(() => options.now ?? 1_000_000);
   let state: WorkflowState = {
     ...structuredClone(DEFAULT_WORKFLOW_STATE),
     ...options.state,
@@ -75,6 +83,10 @@ function harness(options: { known?: string[]; state?: Partial<WorkflowState> } =
       },
       walletAddress: "0x" + "11".repeat(20),
       chainId: 16661,
+      config: {
+        predictionReadCooldownSeconds: options.predictionReadCooldownSeconds ?? 0,
+        rateLimitBackoffMinutes: 15,
+      },
       registry: registry(options.known),
       checkpoint: {
         load: async () => state,
@@ -90,9 +102,12 @@ function harness(options: { known?: string[]; state?: Partial<WorkflowState> } =
       },
       isPaused: () => false,
       onProgress: async (_update: PredictionProgressUpdate): Promise<void> => undefined,
+      sleep,
+      now,
     },
     get state() { return state; },
     predictionPages,
+    sleep,
   };
 }
 
@@ -130,6 +145,95 @@ describe("Predictions runner", () => {
       chainId: 16661,
       limit: 20,
       before: 202,
+    });
+  });
+
+  it("marks a source agent completed only after all prediction pages finish", async () => {
+    const setup = harness({ now: 10_000 });
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.state.predictionScanStartedAt).toBe(10_000);
+    expect(setup.state.completedPredictionSourceIds).toEqual([3314]);
+  });
+
+  it("skips source agents completed in the active scan window", async () => {
+    const setup = harness({
+      state: {
+        sourceAgentIds: [3314, 60062],
+        completedPredictionSourceIds: [3314],
+        predictionScanStartedAt: 10_000,
+      },
+      now: 20_000,
+    });
+    setup.predictionPages.set(60062, [page([prediction("fresh-60062", 60062)], null)]);
+
+    await expect(
+      runPredictions(setup.deps, { scan: "incremental", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.requestedSources).toEqual([60062]);
+    expect(setup.submitted).toEqual(["fresh-60062"]);
+    expect(setup.state.completedPredictionSourceIds).toEqual([3314, 60062]);
+  });
+
+  it("starts a new prediction source scan window after 24 hours from scan start", async () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const setup = harness({
+      state: {
+        sourceAgentIds: [3314],
+        completedPredictionSourceIds: [3314],
+        predictionScanStartedAt: 50_000,
+      },
+      now: 50_000 + dayMs,
+    });
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.requestedSources).toEqual([3314, 3314]);
+    expect(setup.state.predictionScanStartedAt).toBe(50_000 + dayMs);
+    expect(setup.state.completedPredictionSourceIds).toEqual([3314]);
+  });
+
+  it("waits before each predictions read request", async () => {
+    const setup = harness({ predictionReadCooldownSeconds: 2 });
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "completed" });
+
+    expect(setup.sleep).toHaveBeenCalledTimes(2);
+    expect(setup.sleep).toHaveBeenNthCalledWith(1, 2_000);
+    expect(setup.sleep).toHaveBeenNthCalledWith(2, 2_000);
+  });
+
+  it("returns rate_limited when reading predictions hits the API limit", async () => {
+    const setup = harness();
+    const updates: PredictionProgressUpdate[] = [];
+    setup.deps.onProgress = vi.fn(async (update) => { updates.push(update); });
+    setup.deps.api.listAgentPredictions.mockImplementation(async () => {
+      throw new EvoEvoHttpError(
+        "EvoEvo API GET https://api.evoevo.ai/v1/agents/6714/predictions -> 429 : {\"error\":\"rate limit exceeded\"}",
+        429,
+        true,
+      );
+    });
+
+    await expect(
+      runPredictions(setup.deps, { scan: "full", targetAgentId: 900 }),
+    ).resolves.toEqual({ kind: "rate_limited", retryAfterMs: 900_000 });
+
+    expect(setup.state.completedPredictionSourceIds).toEqual([]);
+    expect(updates).toContainEqual({
+      activity: {
+        type: "predictions-rate-limited",
+        retryAfterMs: 900_000,
+        sourceAgentId: 3314,
+      },
     });
   });
 
@@ -201,7 +305,11 @@ describe("Predictions runner", () => {
     ).resolves.toEqual({ kind: "rate_limited", retryAfterMs: 900_000 });
 
     expect(updates).toContainEqual({
-      activity: { type: "predictions-rate-limited", retryAfterMs: 900_000 },
+      activity: {
+        type: "predictions-rate-limited",
+        retryAfterMs: 900_000,
+        sourceAgentId: 3314,
+      },
     });
   });
 

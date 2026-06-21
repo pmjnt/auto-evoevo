@@ -180,6 +180,7 @@ function fullScanDue(
   config: ExtensionConfig,
   now: number,
 ): boolean {
-  return state.lastReconciliationAt === null ||
-    now - state.lastReconciliationAt >= config.reconciliationIntervalMinutes * 60_000;
+  const anchor = state.predictionScanStartedAt ?? state.lastReconciliationAt;
+  return anchor === null ||
+    now - anchor >= config.reconciliationIntervalMinutes * 60_000;
 }
