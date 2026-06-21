@@ -183,7 +183,9 @@ describe("WorkflowCoordinator", () => {
     await setup.value.idle();
 
     expect(calls).toEqual(["predictions:start", "predictions:paused=true", "feed"]);
-    expect(chrome.alarms.create).toHaveBeenCalledWith("workflow-cycle", { when: 7_201_000 });
+    expect(await chrome.alarms.get(WORKFLOW_ALARM_NAME)).toMatchObject({
+      scheduledTime: 7_201_000,
+    });
   });
 
   it("interrupts active Feed and starts Predictions when Run Predictions is clicked", async () => {

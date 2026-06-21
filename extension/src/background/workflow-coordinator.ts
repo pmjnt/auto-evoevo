@@ -24,12 +24,13 @@ export class WorkflowCoordinator {
   private running: Promise<void> | null = null;
   private readonly now: () => number;
   private pauseRequested = false;
+  private pendingMode: WorkflowMode | null = null;
 
   constructor(private readonly deps: WorkflowCoordinatorDeps) {
     this.now = deps.now ?? Date.now;
   }
 
-  async start(mode: WorkflowMode): Promise<{ started: boolean }> {
+  private async activateMode(mode: WorkflowMode): Promise<void> {
     const state = await this.deps.getState();
     state.mode = mode;
     state.status = "running";
@@ -37,12 +38,25 @@ export class WorkflowCoordinator {
     state.nextRunAt = null;
     state.lastError = null;
     await this.deps.setState(state);
+  }
+
+  async start(mode: WorkflowMode): Promise<{ started: boolean }> {
+    await this.activateMode(mode);
+
+    if (this.running !== null) {
+      this.pendingMode = mode;
+      this.pauseRequested = true;
+      await chrome.alarms.clear(WORKFLOW_ALARM_NAME);
+      return { started: true };
+    }
+
     this.pauseRequested = false;
     this.launchCycle();
     return { started: true };
   }
 
   async pause(): Promise<void> {
+    this.pendingMode = null;
     const state = await this.deps.getState();
     state.status = "paused";
     state.activeWorkflow = null;
@@ -50,6 +64,13 @@ export class WorkflowCoordinator {
     await this.deps.setState(state);
     this.pauseRequested = true;
     await chrome.alarms.clear(WORKFLOW_ALARM_NAME);
+  }
+
+  private async handleRunnerPaused(): Promise<void> {
+    if (this.pendingMode !== null) {
+      return;
+    }
+    await this.pause();
   }
 
   async status(): Promise<WorkflowState> {
@@ -81,13 +102,32 @@ export class WorkflowCoordinator {
 
   private launchCycle(): void {
     if (this.running !== null) return;
-    this.running = this.runCycle()
+    this.running = this.runCycles()
       .catch(async (error: unknown) => {
         await this.pauseWithError(errorMessage(error));
       })
       .finally(() => {
         this.running = null;
       });
+  }
+
+  private async runCycles(): Promise<void> {
+    while (true) {
+      await this.runCycle();
+
+      const pending = this.pendingMode;
+      this.pendingMode = null;
+      if (pending === null) {
+        return;
+      }
+
+      const state = await this.deps.getState();
+      if (state.status !== "running" || state.mode !== pending) {
+        return;
+      }
+
+      this.pauseRequested = false;
+    }
   }
 
   private async runCycle(): Promise<void> {
@@ -105,7 +145,7 @@ export class WorkflowCoordinator {
       await this.deps.setState(state);
       const result = await this.deps.runFeed();
       if (result.kind === "paused") {
-        await this.pause();
+        await this.handleRunnerPaused();
         return;
       }
       if (result.kind === "failed" && result.global) {
@@ -122,7 +162,7 @@ export class WorkflowCoordinator {
       const scan = fullScanDue(state, config, this.now()) ? "full" : "incremental";
       const result = await this.deps.runPredictions(config.agentId, scan);
       if (result.kind === "paused") {
-        await this.pause();
+        await this.handleRunnerPaused();
         return;
       }
       if (result.kind === "failed" && result.global) {
@@ -161,6 +201,7 @@ export class WorkflowCoordinator {
   }
 
   private async pauseWithError(reason: string): Promise<void> {
+    this.pendingMode = null;
     const state = await this.deps.getState();
     state.status = "paused";
     state.activeWorkflow = null;
