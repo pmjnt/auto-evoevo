@@ -3,7 +3,7 @@
   "name": "Auto EvoEvo",
   "version": "0.2.0",
   "description": "Direct-API automation for EvoEvo memories. Signs locally, broadcasts to 0G — no evoevo.ai tab required.",
-  "permissions": ["storage", "sidePanel", "declarativeNetRequestWithHostAccess"],
+  "permissions": ["storage", "sidePanel", "alarms", "declarativeNetRequestWithHostAccess"],
   "host_permissions": ["https://api.evoevo.ai/*"],
   "declarative_net_request": {
     "rule_resources": [

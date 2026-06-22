@@ -27,6 +27,9 @@ export type ExtensionConfig = {
   gasPriceJitterPercent: number;
   dryRun: boolean;
   cooldownSeconds: number;
+  memoryApiCooldownSeconds: number;
+  predictionReadCooldownSeconds: number;
+  rateLimitBackoffMinutes: number;
   // Stop automation when each feed tab has fewer than this many
   // unprocessed opinions left. Lets the user leave a buffer rather than
   // draining the feed completely.
@@ -34,6 +37,68 @@ export type ExtensionConfig = {
   // Agent id whose feed we automate. All submissions go through this
   // agent. 0 = unset, automation refuses to start.
   agentId: number;
+  repeatIntervalMinutes: number;
+  reconciliationIntervalMinutes: number;
+};
+
+export type WorkflowMode = "feed" | "predictions" | "both";
+export type WorkflowName = "feed" | "predictions";
+export type WorkflowStatus = "idle" | "running" | "paused" | "error";
+export type FeedTabName = "recommended" | "weekly" | "monthly" | "all_time";
+
+export type PredictionActivityEvent =
+  | { type: "predictions-loading" }
+  | { type: "predictions-sources"; count: number }
+  | { type: "predictions-rate-limited"; retryAfterMs: number; sourceAgentId?: number }
+  | {
+      type: "prediction";
+      phase: "submitting" | "confirmed" | "already_adopted" | "skipped" | "failed";
+      sourceAgentId: number;
+      targetAgentId: number;
+      predictionId: string;
+      txHash?: string;
+      reason?: string;
+    };
+
+export type WorkflowCounters = {
+  ownedAgents: number;
+  feedAgentsCompleted: number;
+  sourceAgents: number;
+  predictionsScanned: number;
+  added: number;
+  skipped: number;
+  failed: number;
+  registryBytes: number;
+};
+
+export type RetryItem = {
+  predictionId: string;
+  opinionId: number;
+  sourceAgentId: number;
+  targetAgentId: number;
+  attempts: number;
+  retryAfter: number;
+};
+
+export type WorkflowState = {
+  version: 1;
+  mode: WorkflowMode | null;
+  status: WorkflowStatus;
+  activeWorkflow: WorkflowName | null;
+  nextRunAt: number | null;
+  lastIncrementalAt: number | null;
+  lastReconciliationAt: number | null;
+  feedAgentIndex: number;
+  feedTab: FeedTabName | null;
+  squareOffset: number;
+  sourceAgentIds: number[];
+  completedPredictionSourceIds: number[];
+  predictionScanStartedAt: number | null;
+  predictionOffsets: Record<string, number>;
+  retryQueue: RetryItem[];
+  blockedPredictionIds: string[];
+  counters: WorkflowCounters;
+  lastError: string | null;
 };
 
 export type AttemptStatus =

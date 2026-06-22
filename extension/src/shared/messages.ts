@@ -27,6 +27,9 @@ export const pauseSchema = z.object({ type: z.literal("pause") });
 export const resumeSchema = z.object({ type: z.literal("resume") });
 export const startSchema = z.object({ type: z.literal("start") });
 export const stopSchema = z.object({ type: z.literal("stop") });
+export const runFeedSchema = z.object({ type: z.literal("run-feed") });
+export const runPredictionsSchema = z.object({ type: z.literal("run-predictions") });
+export const runBothSchema = z.object({ type: z.literal("run-both") });
 
 // Store the private key as plaintext in chrome.storage.local. There is
 // no master password — distribution is controlled out-of-band.
@@ -52,8 +55,13 @@ export const setConfigSchema = z.object({
     gasPriceJitterPercent: z.number().min(0).max(100).default(10),
     dryRun: z.boolean(),
     cooldownSeconds: z.number().int().min(0).max(300).default(0),
+    memoryApiCooldownSeconds: z.number().int().min(0).max(60).default(1),
+    predictionReadCooldownSeconds: z.number().int().min(0).max(60).default(2),
+    rateLimitBackoffMinutes: z.number().int().min(1).max(1440).default(15),
     stopAtRemaining: z.number().int().min(0).max(1000).default(10),
     agentId: z.number().int().min(0).default(0),
+    repeatIntervalMinutes: z.number().int().min(30).max(1440).default(120),
+    reconciliationIntervalMinutes: z.number().int().min(30).max(1440).default(1440),
   }),
 });
 
@@ -68,6 +76,9 @@ export const messageSchema = z.discriminatedUnion("type", [
   resumeSchema,
   startSchema,
   stopSchema,
+  runFeedSchema,
+  runPredictionsSchema,
+  runBothSchema,
   setPrivateKeySchema,
   clearPrivateKeySchema,
   setConfigSchema,

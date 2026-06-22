@@ -2,24 +2,32 @@ import { parseMessage } from "../shared/messages.js";
 import {
   clearPrivateKey,
   getConfig,
+  getWorkflowState,
   setConfig as persistConfig,
   setPrivateKey,
+  setWorkflowState,
 } from "./storage.js";
 import { Wallet } from "./wallet.js";
 import { RpcClient } from "./rpc.js";
 import { SessionLog } from "./session-log.js";
 import { EvoEvoApiClient } from "./evoevo-api.js";
 import type { SiweAuth } from "./siwe.js";
-import { runDirect } from "./direct-runner.js";
+import { runFeedForAgent, type RunnerResult } from "./direct-runner.js";
+import { runFeedWorkflow } from "./feed-workflow.js";
+import { ChromePredictionRegistry } from "./prediction-registry.js";
+import { runPredictions } from "./predictions-runner.js";
+import { submitIntake } from "./intake-submitter.js";
+import { preparePredictionIntake } from "./prediction-submitter.js";
+import { recordPredictionProgress } from "./prediction-progress.js";
+import {
+  WORKFLOW_ALARM_NAME,
+  WorkflowCoordinator,
+} from "./workflow-coordinator.js";
 
 const wallet = new Wallet();
 const log = new SessionLog();
 let paused = false;
-let directLoopRunning = false;
 let lastRunStatus: "idle" | "running" | "done" | "error" = "idle";
-let stopResolve: (() => void) | null = null;
-
-const ROUND_INTERVAL_MS = 30_000;
 
 // Persist the SIWE token across service-worker restarts. Lives in
 // chrome.storage.session so it is cleared when the user closes Chrome
@@ -45,17 +53,105 @@ const evoEvoApi = new EvoEvoApiClient({
     },
   },
 });
+const registry = new ChromePredictionRegistry();
 
 export type RouterResponse =
   | { ok: true; [key: string]: unknown }
   | { ok: false; error: { code: number; message: string } };
 
-async function stopAndWait(): Promise<void> {
-  if (!directLoopRunning) return;
-  paused = true;
-  await new Promise<void>((resolve) => {
-    stopResolve = resolve;
-  });
+const coordinator: WorkflowCoordinator = new WorkflowCoordinator({
+  getConfig,
+  getState: getWorkflowState,
+  setState: setWorkflowState,
+  runFeed: async (): Promise<RunnerResult> => {
+    const config = await getConfig();
+    if (config === null) {
+      return { kind: "failed", reason: "Extension not configured", global: true };
+    }
+    if (wallet.address === null) {
+      return { kind: "failed", reason: "Wallet locked", global: true };
+    }
+    const rpc = new RpcClient(config.rpcUrl);
+    return await runFeedWorkflow({
+      api: evoEvoApi,
+      ensureAuth: async () => await evoEvoApi.ensureAuth(
+        wallet.address!,
+        (message) => wallet.signMessage(message),
+      ),
+      walletAddress: wallet.address,
+      chainId: config.chainId,
+      isPaused: (): boolean => coordinator.isPaused(),
+      onProgress: () => undefined,
+      runAgent: async (agentId): Promise<RunnerResult> => await runFeedForAgent({
+        config,
+        wallet: {
+          address: wallet.address,
+          signMessage: (msg) => wallet.signMessage(msg),
+          signTransaction: (tx) => wallet.signTransaction(tx),
+        },
+        rpc,
+        api: evoEvoApi,
+        log,
+        onEvent: sendWorkflowEvent,
+        isPaused: (): boolean => coordinator.isPaused(),
+      }, agentId),
+    });
+  },
+  runPredictions: async (targetAgentId, scan) => {
+    const config = await getConfig();
+    if (config === null) {
+      return { kind: "failed", reason: "Extension not configured", global: true };
+    }
+    if (wallet.address === null) {
+      return { kind: "failed", reason: "Wallet locked", global: true };
+    }
+    await evoEvoApi.ensureAuth(wallet.address, (message) =>
+      wallet.signMessage(message),
+    );
+    const rpc = new RpcClient(config.rpcUrl);
+    return await runPredictions({
+      api: evoEvoApi,
+      walletAddress: wallet.address,
+      chainId: config.chainId,
+      config,
+      registry,
+      checkpoint: { load: getWorkflowState, save: setWorkflowState },
+      isPaused: () => coordinator.isPaused(),
+      onProgress: async (update) => await recordPredictionProgress(update, {
+        getState: getWorkflowState,
+        setState: setWorkflowState,
+        sendEvent: sendWorkflowEvent,
+      }),
+      submitPrediction: async (_sourceAgentId, agentId, prediction) => {
+        const prepared = await preparePredictionIntake({
+          api: evoEvoApi,
+          config,
+          log,
+          sourceAgentId: _sourceAgentId,
+          targetAgentId: agentId,
+          predictionId: prediction.predictionId,
+          opinionId: prediction.opinionId,
+        });
+        if (prepared.kind === "already_adopted") return prepared;
+        if (prepared.kind === "rate_limited") return prepared;
+        return await submitIntake(prepared.memory.reasoning_intake_with_sig, {
+          config: { ...config, agentId },
+          wallet: {
+            address: wallet.address,
+            signTransaction: (tx) => wallet.signTransaction(tx),
+          },
+          rpc,
+          log,
+        });
+      },
+    }, { targetAgentId, scan });
+  },
+});
+
+function sendWorkflowEvent(event: unknown): void {
+  void chrome.runtime
+    .sendMessage({ type: "workflow-event", event })
+    .catch(() => undefined);
 }
 
 export async function handleMessage(raw: unknown): Promise<RouterResponse> {
@@ -126,14 +222,16 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
 
     case "get-status": {
       const ready = await wallet.ready();
+      const workflow = await coordinator.status();
       return {
         ok: true,
         ready,
         address: wallet.address,
-        paused,
-        running: directLoopRunning,
+        paused: workflow.status === "paused",
+        running: workflow.status === "running",
         lastRunStatus,
         counts: await log.counts(),
+        workflow,
       };
     }
 
@@ -142,23 +240,30 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
 
     case "pause":
       paused = true;
+      await coordinator.pause();
       return { ok: true };
 
     case "resume":
       paused = false;
-      return await startAutomation();
+      return await startMode("feed");
 
     case "start": {
-      await stopAndWait();
-      paused = false;
-      await log.clear();
-      lastRunStatus = "idle";
-      return await startAutomation();
+      return await startMode("feed");
     }
 
     case "stop":
       paused = true;
+      await coordinator.pause();
       return { ok: true };
+
+    case "run-feed":
+      return await startMode("feed");
+
+    case "run-predictions":
+      return await startMode("predictions");
+
+    case "run-both":
+      return await startMode("both");
 
     case "set-config":
       await persistConfig(message.config);
@@ -175,7 +280,7 @@ export async function handleMessage(raw: unknown): Promise<RouterResponse> {
   }
 }
 
-async function startAutomation(): Promise<RouterResponse> {
+async function startMode(mode: "feed" | "predictions" | "both"): Promise<RouterResponse> {
   const config = await getConfig();
   if (config === null) {
     return {
@@ -187,51 +292,14 @@ async function startAutomation(): Promise<RouterResponse> {
   if (!ready || wallet.address === null) {
     return {
       ok: false,
-      error: { code: 4100, message: "Wallet has no private key — import one in Settings" },
+      error: { code: 4100, message: "Wallet has no private key. Import one in Settings." },
     };
   }
-  if (directLoopRunning) {
-    return { ok: true, note: "already running" };
-  }
-
-  directLoopRunning = true;
+  paused = false;
+  await log.clear();
   lastRunStatus = "running";
-  void (async () => {
-    try {
-      const rpc = new RpcClient(config.rpcUrl);
-      while (!paused) {
-        await runDirect({
-          config,
-          wallet: {
-            address: wallet.address,
-            signMessage: (msg) => wallet.signMessage(msg),
-            signTransaction: (tx) => wallet.signTransaction(tx),
-          },
-          rpc,
-          api: evoEvoApi,
-          log,
-          onEvent: (event) => {
-            void chrome.runtime
-              .sendMessage({ type: "direct-event", event })
-              .catch(() => undefined);
-          },
-          isPaused: () => paused,
-        });
-        if (paused) break;
-        await new Promise((r) => setTimeout(r, ROUND_INTERVAL_MS));
-      }
-      lastRunStatus = paused ? "idle" : "done";
-    } catch {
-      lastRunStatus = "error";
-    } finally {
-      directLoopRunning = false;
-      if (stopResolve) {
-        stopResolve();
-        stopResolve = null;
-      }
-    }
-  })();
-  return { ok: true, started: true };
+  const result = await coordinator.start(mode);
+  return { ok: true, ...result };
 }
 
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
@@ -239,6 +307,15 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
     handleMessage(message).then(sendResponse);
     return true;
   });
+}
+
+if (typeof chrome !== "undefined" && chrome.alarms?.onAlarm) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === WORKFLOW_ALARM_NAME) {
+      void coordinator.handleAlarm(alarm.name);
+    }
+  });
+  void coordinator.recover();
 }
 
 if (typeof chrome !== "undefined" && chrome.sidePanel?.setPanelBehavior) {

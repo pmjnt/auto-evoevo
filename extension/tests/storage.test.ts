@@ -2,10 +2,15 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { installFakeChromeApi } from "./fixtures/chrome-api.js";
 import {
   clearPrivateKey,
+  DEFAULT_WORKFLOW_STATE,
   getConfig,
+  getPredictionIds,
   getPrivateKey,
+  getWorkflowState,
   setConfig,
+  setPredictionIds,
   setPrivateKey,
+  setWorkflowState,
 } from "../src/background/storage.js";
 import type { ExtensionConfig } from "../src/shared/types.js";
 
@@ -20,8 +25,13 @@ const fakeConfig: ExtensionConfig = {
   gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 0,
+  memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 0,
   agentId: 0,
+  repeatIntervalMinutes: 120,
+  reconciliationIntervalMinutes: 1440,
 };
 
 const TEST_KEY = "0x" + "11".repeat(32);
@@ -61,6 +71,41 @@ describe("storage", () => {
     expect(await getConfig()).toEqual(fakeConfig);
   });
 
+  it("defaults workflow intervals for old stored config", async () => {
+    const {
+      repeatIntervalMinutes: _repeat,
+      reconciliationIntervalMinutes: _reconciliation,
+      ...oldConfig
+    } = fakeConfig;
+    await chrome.storage.local.set({ config: oldConfig });
+
+    expect(await getConfig()).toEqual(fakeConfig);
+  });
+
+  it("defaults predictions rate limit controls for old stored config", async () => {
+    const {
+      memoryApiCooldownSeconds: _memoryApiCooldownSeconds,
+      predictionReadCooldownSeconds: _predictionReadCooldownSeconds,
+      rateLimitBackoffMinutes: _rateLimitBackoffMinutes,
+      ...oldConfig
+    } = fakeConfig;
+    await chrome.storage.local.set({ config: oldConfig });
+
+    expect(await getConfig()).toEqual(fakeConfig);
+  });
+
+  it("defaults prediction read cooldown for older configs", async () => {
+    const {
+      predictionReadCooldownSeconds: _predictionReadCooldownSeconds,
+      ...legacy
+    } = fakeConfig;
+    await chrome.storage.local.set({ config: legacy });
+
+    await expect(getConfig()).resolves.toMatchObject({
+      predictionReadCooldownSeconds: 2,
+    });
+  });
+
   it("migrates old intakeReasoning selectors to intakeReasoningV2", async () => {
     await chrome.storage.local.set({
       config: {
@@ -78,5 +123,33 @@ describe("storage", () => {
   it("rejects invalid stored config shape", async () => {
     await chrome.storage.local.set({ config: { allowedOrigin: 42 } });
     await expect(getConfig()).rejects.toThrow();
+  });
+
+  it("round-trips workflow state and defaults when absent", async () => {
+    expect(await getWorkflowState()).toEqual(DEFAULT_WORKFLOW_STATE);
+    const state = {
+      ...structuredClone(DEFAULT_WORKFLOW_STATE),
+      status: "paused" as const,
+      sourceAgentIds: [3314, 4420],
+    };
+    await setWorkflowState(state);
+    expect(await getWorkflowState()).toEqual(state);
+  });
+
+  it("defaults prediction scan checkpoint fields for older workflow state", async () => {
+    const legacy = structuredClone(DEFAULT_WORKFLOW_STATE) as Partial<typeof DEFAULT_WORKFLOW_STATE>;
+    delete legacy.completedPredictionSourceIds;
+    delete legacy.predictionScanStartedAt;
+    await chrome.storage.local.set({ workflowState: legacy });
+
+    await expect(getWorkflowState()).resolves.toMatchObject({
+      completedPredictionSourceIds: [],
+      predictionScanStartedAt: null,
+    });
+  });
+
+  it("sorts and deduplicates prediction ids", async () => {
+    await setPredictionIds(["p2", "p1", "p2"]);
+    expect(await getPredictionIds()).toEqual(["p1", "p2"]);
   });
 });

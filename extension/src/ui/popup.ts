@@ -1,5 +1,6 @@
 import { send } from "./shared.js";
-import type { ExtensionConfig } from "../shared/types.js";
+import { formatWorkflowEvent } from "./workflow-events.js";
+import type { ExtensionConfig, WorkflowState } from "../shared/types.js";
 
 const DEFAULT_CONFIG: ExtensionConfig = {
   allowedOrigin: "https://evoevo.ai",
@@ -12,8 +13,13 @@ const DEFAULT_CONFIG: ExtensionConfig = {
   gasPriceJitterPercent: 10,
   dryRun: true,
   cooldownSeconds: 1,
+  memoryApiCooldownSeconds: 1,
+  predictionReadCooldownSeconds: 2,
+  rateLimitBackoffMinutes: 15,
   stopAtRemaining: 10,
   agentId: 0,
+  repeatIntervalMinutes: 120,
+  reconciliationIntervalMinutes: 1440,
 };
 
 type Status = {
@@ -24,6 +30,7 @@ type Status = {
   running?: boolean;
   lastRunStatus?: "idle" | "running" | "done" | "error";
   counts: Record<string, number>;
+  workflow?: WorkflowState;
 };
 
 type AgentSummary = {
@@ -57,60 +64,94 @@ function setChecked(id: string, checked: boolean): void {
   if (el) el.checked = checked;
 }
 
-function setMsg(id: string, text: string, kind: "ok" | "err" | "info" = "info"): void {
+function setMsg(id: string, message: string, kind: "ok" | "err" | "info" = "info"): void {
   const el = document.getElementById(id);
   if (!el) return;
-  el.textContent = text;
+  el.textContent = message;
   el.classList.toggle("ok", kind === "ok");
   el.classList.toggle("err", kind === "err");
 }
 
-let lastStatus: Status | null = null;
+function clampInt(value: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
+function validateIntervals(): string | null {
+  for (const [id, label] of [
+    ["repeatIntervalMinutes", "Repeat interval"],
+    ["reconciliationIntervalMinutes", "Full scan interval"],
+  ] as const) {
+    const value = Number(elValue(id));
+    if (!Number.isInteger(value) || value < 30 || value > 1440) {
+      return label + " must be between 30 and 1440 minutes.";
+    }
+  }
+  return null;
+}
+
 let configLoaded = false;
+let selectedTab: "feed" | "predictions" = "feed";
 
 async function refreshStatus(): Promise<void> {
   const status = (await send({ type: "get-status" })) as Status;
   if (!status.ok) return;
-  lastStatus = status;
   if (!status.ready) {
     show("setup");
     return;
   }
+
   show("ready");
-  setText("address", status.address ?? "—");
+  const workflow = status.workflow;
+  const counters = workflow?.counters;
+  const stateText = workflow?.status ?? (status.paused ? "paused" : status.running ? "running" : "idle");
+
+  setText("address", status.address ?? "-");
   setInput("walletAddress", status.address ?? "");
+  setText("status-text", stateText);
+  setText("active-workflow", workflow?.activeWorkflow ?? workflow?.mode ?? "none");
+  setText("next-run", formatNextRun(workflow?.nextRunAt ?? null));
   setText("signed", String(status.counts["signed"] ?? 0));
-  setText("dry", String(status.counts["dry_run"] ?? 0));
-  setText("manual", String(status.counts["manual_review"] ?? 0));
-  setText("rejected", String(status.counts["rejected"] ?? 0));
-  setText("reverted", String(status.counts["reverted"] ?? 0));
+  setText("failed", String((status.counts["rpc_failed"] ?? 0) + (status.counts["reverted"] ?? 0)));
+  setText("owned-agents", String(counters?.ownedAgents ?? 0));
+  setText("feed-completed", String(counters?.feedAgentsCompleted ?? 0));
+  setText("source-agents", String(counters?.sourceAgents ?? 0));
+  setText("predictions-scanned", String(counters?.predictionsScanned ?? 0));
+  setText("predictions-added", String(counters?.added ?? 0));
+  setText("predictions-skipped", String(counters?.skipped ?? 0));
 
   const statusEl = document.getElementById("status-text");
   if (statusEl) {
-    if (status.paused) {
-      statusEl.textContent = "paused";
-      statusEl.style.color = "#ffd166";
-    } else if (status.running) {
-      statusEl.textContent = "running";
-      statusEl.style.color = "#65d18f";
-    } else if (status.lastRunStatus === "done") {
-      statusEl.textContent = "done";
-      statusEl.style.color = "#65d18f";
-    } else if (status.lastRunStatus === "error") {
-      statusEl.textContent = "error";
-      statusEl.style.color = "#ef6461";
-    } else {
-      statusEl.textContent = "idle";
-      statusEl.style.color = "#b9a895";
-    }
+    statusEl.style.color =
+      stateText === "running" ? "#65d18f" :
+      stateText === "paused" ? "#f2c94c" :
+      stateText === "error" ? "#ef6461" :
+      "#c9d0d5";
   }
 
-  const pauseBtn = document.getElementById("pause") as HTMLButtonElement | null;
-  if (pauseBtn) pauseBtn.textContent = status.paused ? "Resume" : "Pause";
+  setRunDisabled(workflow?.status === "running");
+  if (workflow?.lastError) setMsg("start-msg", workflow.lastError, "err");
 
   if (!configLoaded) {
     await loadConfig();
     configLoaded = true;
+  }
+}
+
+function formatNextRun(value: number | null): string {
+  if (value === null) return "-";
+  const diffMs = value - Date.now();
+  if (diffMs <= 0) return "due";
+  const minutes = Math.ceil(diffMs / 60_000);
+  if (minutes < 60) return String(minutes) + "m";
+  return String(Math.ceil(minutes / 60)) + "h";
+}
+
+function setRunDisabled(disabled: boolean): void {
+  for (const id of ["runFeed", "runPredictions", "runBoth"]) {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    if (button) button.disabled = disabled;
   }
 }
 
@@ -119,15 +160,24 @@ function fillConfig(config: ExtensionConfig): void {
   setInput("chainId", config.chainId);
   setInput("maxFeeNative", config.maxFeeNative);
   setInput("gasPriceJitterPercent", config.gasPriceJitterPercent);
+  setInput("repeatIntervalMinutes", config.repeatIntervalMinutes);
+  setInput("reconciliationIntervalMinutes", config.reconciliationIntervalMinutes);
   setInput("allowedContracts", config.allowedContracts.join(", "));
   setInput("allowedFunctionSelectors", config.allowedFunctionSelectors.join(", "));
   setInput("cooldownSeconds", config.cooldownSeconds);
+  setInput("memoryApiCooldownSeconds", config.memoryApiCooldownSeconds);
+  setInput("predictionReadCooldownSeconds", config.predictionReadCooldownSeconds);
+  setInput("rateLimitBackoffMinutes", config.rateLimitBackoffMinutes);
   setInput("stopAtRemaining", config.stopAtRemaining);
   setChecked("dryRun", config.dryRun);
 
   const agentSelect = document.getElementById("agentId") as HTMLSelectElement | null;
   if (agentSelect && config.agentId > 0) {
-    agentSelect.innerHTML = `<option value="${config.agentId}">Saved: ${config.agentId} (refresh to verify)</option>`;
+    agentSelect.innerHTML = "";
+    const option = document.createElement("option");
+    option.value = String(config.agentId);
+    option.textContent = "Saved target: " + config.agentId;
+    agentSelect.append(option);
     agentSelect.value = String(config.agentId);
   }
 }
@@ -147,34 +197,118 @@ async function loadAgents(): Promise<void> {
   const select = document.getElementById("agentId") as HTMLSelectElement | null;
   if (!select) return;
   const savedValue = select.value;
-  select.innerHTML = '<option value="0">Loading…</option>';
+  select.innerHTML = "";
+  select.append(option("0", "Loading..."));
+
   const response = (await send({ type: "get-agents" })) as {
     ok: boolean;
     agents?: AgentSummary[];
     error?: { message: string };
   };
+
+  select.innerHTML = "";
   if (!response.ok || !response.agents) {
-    select.innerHTML = `<option value="0">Failed: ${response.error?.message ?? "unknown"}</option>`;
+    select.append(option("0", "Failed: " + (response.error?.message ?? "unknown")));
     return;
   }
-  const agents = response.agents;
-  if (agents.length === 0) {
-    select.innerHTML = '<option value="0">No agents for this wallet</option>';
+  if (response.agents.length === 0) {
+    select.append(option("0", "No agents for this wallet"));
     return;
   }
-  select.innerHTML = agents
-    .map((a) => {
-      const onchain = a.onchain_identity?.identity_agent_id;
-      const label = `#${a.id} ${a.name}` + (onchain ? ` (token ${onchain})` : "");
-      return `<option value="${a.id}">${label}</option>`;
-    })
-    .join("");
-  if (agents.some((a) => String(a.id) === savedValue)) {
+  for (const agent of response.agents) {
+    const onchain = agent.onchain_identity?.identity_agent_id;
+    const label = "#" + agent.id + " " + agent.name + (onchain ? " (token " + onchain + ")" : "");
+    select.append(option(String(agent.id), label));
+  }
+  if (response.agents.some((agent) => String(agent.id) === savedValue)) {
     select.value = savedValue;
   }
 }
 
-// --- WIRING ---
+function option(value: string, label: string): HTMLOptionElement {
+  const item = document.createElement("option");
+  item.value = value;
+  item.textContent = label;
+  return item;
+}
+
+function selectTab(tab: "feed" | "predictions"): void {
+  selectedTab = tab;
+  document.getElementById("tabFeed")?.classList.toggle("active", tab === "feed");
+  document.getElementById("tabPredictions")?.classList.toggle("active", tab === "predictions");
+  document.getElementById("feed-panel")?.classList.toggle("active", tab === "feed");
+  document.getElementById("predictions-panel")?.classList.toggle("active", tab === "predictions");
+  document.getElementById("tabFeed")?.setAttribute("aria-selected", String(tab === "feed"));
+  document.getElementById("tabPredictions")?.setAttribute("aria-selected", String(tab === "predictions"));
+}
+
+function currentConfig(): ExtensionConfig {
+  const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;
+  return {
+    allowedOrigin: "https://evoevo.ai",
+    allowedChain: "0G",
+    chainId: Number(elValue("chainId")) || DEFAULT_CONFIG.chainId,
+    rpcUrl: elValue("rpcUrl") || DEFAULT_CONFIG.rpcUrl,
+    allowedContracts: elValue("allowedContracts")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    allowedFunctionSelectors: elValue("allowedFunctionSelectors")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    maxFeeNative: Number(elValue("maxFeeNative")) || DEFAULT_CONFIG.maxFeeNative,
+    gasPriceJitterPercent: clampInt(elValue("gasPriceJitterPercent"), DEFAULT_CONFIG.gasPriceJitterPercent, 0, 100),
+    dryRun: dryRunEl?.checked ?? true,
+    cooldownSeconds: clampInt(elValue("cooldownSeconds"), 0, 0, 300),
+    memoryApiCooldownSeconds: clampInt(elValue("memoryApiCooldownSeconds"), DEFAULT_CONFIG.memoryApiCooldownSeconds, 0, 60),
+    predictionReadCooldownSeconds: clampInt(elValue("predictionReadCooldownSeconds"), DEFAULT_CONFIG.predictionReadCooldownSeconds, 0, 60),
+    rateLimitBackoffMinutes: clampInt(elValue("rateLimitBackoffMinutes"), DEFAULT_CONFIG.rateLimitBackoffMinutes, 1, 1440),
+    stopAtRemaining: clampInt(elValue("stopAtRemaining"), 0, 0, 1000),
+    agentId: Math.max(0, Number(elValue("agentId")) || 0),
+    repeatIntervalMinutes: clampInt(elValue("repeatIntervalMinutes"), DEFAULT_CONFIG.repeatIntervalMinutes, 30, 1440),
+    reconciliationIntervalMinutes: clampInt(elValue("reconciliationIntervalMinutes"), DEFAULT_CONFIG.reconciliationIntervalMinutes, 30, 1440),
+  };
+}
+
+async function saveConfig(messageId: string): Promise<boolean> {
+  const validationError = validateIntervals();
+  if (validationError !== null) {
+    setMsg(messageId, validationError, "err");
+    return false;
+  }
+  const config = currentConfig();
+  const response = (await send({ type: "set-config", config })) as {
+    ok: boolean;
+    error?: { message: string };
+  };
+  if (!response.ok) {
+    setMsg(messageId, "Config save failed: " + (response.error?.message ?? "unknown"), "err");
+    return false;
+  }
+  return true;
+}
+
+async function saveThenRun(type: "run-feed" | "run-predictions" | "run-both"): Promise<void> {
+  if (type !== "run-feed" && Number(elValue("agentId")) <= 0) {
+    setMsg("start-msg", "Select a target agent before running Predictions.", "err");
+    selectTab("predictions");
+    return;
+  }
+  setMsg("start-msg", "Saving config...", "info");
+  if (!(await saveConfig("start-msg"))) return;
+  const response = (await send({ type })) as {
+    ok: boolean;
+    started?: boolean;
+    error?: { message: string };
+  };
+  if (!response.ok) {
+    setMsg("start-msg", response.error?.message ?? "Failed to run", "err");
+    return;
+  }
+  setMsg("start-msg", "Running.", "ok");
+  await refreshStatus();
+}
 
 document.getElementById("saveKey")?.addEventListener("click", async () => {
   const raw = elValue("setupPrivateKey").trim();
@@ -182,10 +316,9 @@ document.getElementById("saveKey")?.addEventListener("click", async () => {
     setMsg("setup-msg", "Paste a private key first.", "err");
     return;
   }
-  const privateKey = raw.startsWith("0x") ? raw : `0x${raw}`;
+  const privateKey = raw.startsWith("0x") ? raw : "0x" + raw;
   const response = (await send({ type: "set-private-key", privateKey })) as {
     ok: boolean;
-    address?: string;
     error?: { message: string };
   };
   if (!response.ok) {
@@ -198,74 +331,23 @@ document.getElementById("saveKey")?.addEventListener("click", async () => {
 });
 
 document.getElementById("clearKey")?.addEventListener("click", async () => {
-  if (!window.confirm("Remove the private key from this Chrome install?")) return;
+  if (!window.confirm("Remove the private key from this Chrome profile?")) return;
   await send({ type: "clear-private-key" });
   configLoaded = false;
   await refreshStatus();
 });
 
 document.getElementById("pause")?.addEventListener("click", async () => {
-  const type = lastStatus?.paused ? "resume" : "pause";
-  await send({ type });
+  await send({ type: "pause" });
+  setMsg("start-msg", "Paused.", "info");
   await refreshStatus();
 });
 
-function currentConfig() {
-  const dryRunEl = document.getElementById("dryRun") as HTMLInputElement | null;
-  return {
-    allowedOrigin: "https://evoevo.ai",
-    allowedChain: "0G",
-    chainId: Number(elValue("chainId")) || DEFAULT_CONFIG.chainId,
-    rpcUrl: elValue("rpcUrl") || DEFAULT_CONFIG.rpcUrl,
-    allowedContracts: elValue("allowedContracts")
-      .split(",")
-      .map((s: string) => s.trim())
-      .filter(Boolean),
-    allowedFunctionSelectors: elValue("allowedFunctionSelectors")
-      .split(",")
-      .map((s: string) => s.trim())
-      .filter(Boolean),
-    maxFeeNative: Number(elValue("maxFeeNative")) || DEFAULT_CONFIG.maxFeeNative,
-    gasPriceJitterPercent: (() => {
-      const value = Number(elValue("gasPriceJitterPercent"));
-      if (!Number.isFinite(value)) return DEFAULT_CONFIG.gasPriceJitterPercent;
-      return Math.max(0, Math.min(100, value));
-    })(),
-    dryRun: dryRunEl?.checked ?? true,
-    cooldownSeconds: Math.max(0, Math.min(300, Number(elValue("cooldownSeconds")) || 0)),
-    stopAtRemaining: Math.max(0, Math.min(1000, Number(elValue("stopAtRemaining")) || 0)),
-    agentId: Math.max(0, Number(elValue("agentId")) || 0),
-  };
-}
-
-document.getElementById("start")?.addEventListener("click", async () => {
-  setMsg("start-msg", "Saving config…", "info");
-  const saveResp = (await send({ type: "set-config", config: currentConfig() })) as {
-    ok: boolean;
-    error?: { message: string };
-  };
-  if (!saveResp.ok) {
-    setMsg("start-msg", `Config save failed: ${saveResp.error?.message ?? "unknown"}`, "err");
-    return;
-  }
-  setMsg("start-msg", "Starting…", "info");
-  const response = (await send({ type: "start" })) as {
-    ok: boolean;
-    started?: boolean;
-    note?: string;
-    error?: { message: string };
-  };
-  if (!response.ok) {
-    setMsg("start-msg", response.error?.message ?? "Failed to start", "err");
-    return;
-  }
-  if (response.note) {
-    setMsg("start-msg", response.note, "info");
-  } else {
-    setMsg("start-msg", "Started.", "ok");
-  }
-  await refreshStatus();
-});
+document.getElementById("runFeed")?.addEventListener("click", () => void saveThenRun("run-feed"));
+document.getElementById("runPredictions")?.addEventListener("click", () => void saveThenRun("run-predictions"));
+document.getElementById("runBoth")?.addEventListener("click", () => void saveThenRun("run-both"));
+document.getElementById("tabFeed")?.addEventListener("click", () => selectTab("feed"));
+document.getElementById("tabPredictions")?.addEventListener("click", () => selectTab("predictions"));
 
 document.getElementById("loadAgents")?.addEventListener("click", (event) => {
   event.preventDefault();
@@ -273,57 +355,53 @@ document.getElementById("loadAgents")?.addEventListener("click", (event) => {
 });
 
 document.getElementById("save")?.addEventListener("click", async () => {
-  const config = currentConfig();
-  const resp = (await send({ type: "set-config", config })) as {
-    ok: boolean;
-    error?: { message: string };
-  };
-  if (!resp.ok) {
-    setMsg("save-msg", `Failed to save: ${resp.error?.message ?? "unknown"}`, "err");
-    return;
-  }
-  setMsg("save-msg", "Saved.", "ok");
+  if (await saveConfig("save-msg")) setMsg("save-msg", "Saved.", "ok");
 });
 
-void refreshStatus();
-setInterval(() => {
-  void refreshStatus();
-}, 2000);
-
 const MAX_LOG_LINES = 6;
-
-function appendEventLog(text: string): void {
+function appendEventLog(message: string): void {
   const el = document.getElementById("event-log");
   if (!el) return;
   const lines = el.textContent?.split("\n").filter(Boolean) ?? [];
-  lines.push(text);
+  lines.push(message);
   el.textContent = lines.slice(-MAX_LOG_LINES).join("\n");
   el.scrollTop = el.scrollHeight;
 }
 
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message: Record<string, unknown>) => {
-    if (message.type !== "direct-event") return;
+    if (message.type !== "workflow-event" && message.type !== "direct-event") return;
     const event = message.event as Record<string, unknown>;
+    const formatted = formatWorkflowEvent(event);
+    if (formatted !== null) {
+      appendEventLog(formatted);
+      void refreshStatus();
+      return;
+    }
     switch (event.type) {
       case "started":
         appendEventLog("[round] started");
         break;
       case "tab":
-        appendEventLog(`[tab] ${event.tab}`);
+        appendEventLog("[feed] " + String(event.tab));
         break;
       case "fetched":
-        appendEventLog(`[feed] ${event.tab}: ${event.count} items`);
+        appendEventLog("[feed] " + String(event.tab) + ": " + String(event.count));
         break;
       case "approved":
-        appendEventLog(`[tx] ${(event.txHash as string).slice(0, 14)}...`);
+        appendEventLog("[tx] " + String(event.txHash).slice(0, 14) + "...");
         break;
       case "paused":
-        appendEventLog(`[pause] ${event.reason}`);
+        appendEventLog("[pause] " + String(event.reason));
         break;
       case "done":
         appendEventLog("[round] done");
         break;
     }
+    void refreshStatus();
   });
 }
+
+selectTab(selectedTab);
+void refreshStatus();
+setInterval(() => void refreshStatus(), 2000);
